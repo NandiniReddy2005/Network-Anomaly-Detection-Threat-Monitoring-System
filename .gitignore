@@ -1,0 +1,35 @@
+# Environment
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Node.js
+node_modules/
+frontend/node_modules/
+
+# Next.js
+.next/
+frontend/.next/
+
+# Dataset
+backend/data/
+
+# Logs
+*.log
+
+# Build
+dist/
+build/
+
+# VS Code
+.vscode/
+
+# Database
+*.db
+backend/*.db
+
+# Frontend environment
+frontend/.env.local
