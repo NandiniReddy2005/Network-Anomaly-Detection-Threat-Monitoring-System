@@ -238,6 +238,37 @@ body {
   right: 12px;
 }
 
+/* Security Analyst & Security Administrator scoped header/sidebar collapse button fix */
+.ns-analyst-layout .ns-sidebar-brand,
+.ns-admin-layout .ns-sidebar-brand {
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.ns-analyst-layout .ns-collapse-btn,
+.ns-admin-layout .ns-collapse-btn {
+  position: static;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ns-analyst-layout .ns-sidebar.collapsed .ns-sidebar-brand,
+.ns-admin-layout .ns-sidebar.collapsed .ns-sidebar-brand {
+  padding: 0 10px;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.ns-analyst-layout .ns-sidebar.collapsed .ns-collapse-btn,
+.ns-admin-layout .ns-sidebar.collapsed .ns-collapse-btn {
+  position: static;
+  margin-left: 0;
+  flex-shrink: 0;
+}
+
 .ns-sidebar-menu {
   flex: 1;
   padding: 1.5rem 0.75rem;
@@ -2070,7 +2101,7 @@ body {
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   display: block;
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
@@ -4510,9 +4541,387 @@ body,
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 
+/* Hide Next.js Dev Indicator / N logo overlay */
+nextjs-portal,
+#next-developer-indicators,
+[data-next-mark],
+[data-nextjs-toast],
+[data-nextjs-dev-tools],
+[data-nextjs-dialog-overlay] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
 
+/* ==========================================
+   LIGHT THEME COMPATIBILITY FOR SECURITY ANALYST
+   ========================================== */
+[data-theme="light"] {
+  --ns-bg-dark: #f8fafc;
+  --ns-bg-card: #ffffff;
+  --ns-bg-card-hover: #f1f5f9;
+  --ns-border: #e2e8f0;
+  --ns-border-light: #cbd5e1;
+  --ns-text-main: #1e293b;
+  --ns-text-muted: #64748b;
+}
 
+[data-theme="light"] body,
+[data-theme="light"] .ns-soc-layout {
+  background-color: #f8fafc;
+  color: #1e293b;
+}
 
+/* Sidebar & Topbar in Light Theme */
+[data-theme="light"] .ns-sidebar {
+  background-color: #ffffff;
+  border-right-color: #e2e8f0;
+}
 
+[data-theme="light"] .ns-nav-item {
+  color: #475569;
+}
 
-
+[data-theme="light"] .ns-nav-item:hover,
+[data-theme="light"] .ns-nav-item.active {
+  background: #f1f5f9;
+  color: #2563eb;
+}
+
+[data-theme="light"] .ns-topbar {
+  background-color: #ffffff;
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .ns-search-input {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .ns-search-input::placeholder {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .user-profile-pill {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .user-email-text {
+  color: #1e293b;
+}
+
+[data-theme="light"] .user-role-text {
+  color: #475569;
+}
+
+/* Network Monitoring Cards & Boxes */
+[data-theme="light"] .netmon-card,
+[data-theme="light"] .netmon-stat-card,
+[data-theme="light"] .netmon-chart-box,
+[data-theme="light"] .netmon-table-box {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .netmon-header-flex {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .netmon-header-title h3,
+[data-theme="light"] .netmon-stat-metric,
+[data-theme="light"] .netmon-chart-title {
+  color: #1e293b;
+}
+
+[data-theme="light"] .netmon-header-title p,
+[data-theme="light"] .netmon-stat-title {
+  color: #475569;
+}
+
+[data-theme="light"] .netmon-stat-sub {
+  color: #64748b;
+}
+
+[data-theme="light"] .netmon-table th {
+  background: #f1f5f9;
+  color: #334155;
+  border-bottom-color: #cbd5e1;
+}
+
+[data-theme="light"] .netmon-table td {
+  border-bottom-color: #f1f5f9;
+  color: #1e293b;
+}
+
+[data-theme="light"] .netmon-table tr:hover {
+  background: #f8fafc;
+}
+
+/* Traffic Analysis Cards & Boxes */
+[data-theme="light"] .tfanal-card,
+[data-theme="light"] .tfanal-stat-card,
+[data-theme="light"] .tfanal-chart-box,
+[data-theme="light"] .tfanal-table-box,
+[data-theme="light"] .tfanal-insight-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .tfanal-header-flex {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .tfanal-header-title h3,
+[data-theme="light"] .tfanal-stat-metric,
+[data-theme="light"] .tfanal-chart-title,
+[data-theme="light"] .tfanal-insight-value {
+  color: #1e293b;
+}
+
+[data-theme="light"] .tfanal-header-title p,
+[data-theme="light"] .tfanal-stat-title,
+[data-theme="light"] .tfanal-insight-label {
+  color: #475569;
+}
+
+[data-theme="light"] .tfanal-stat-sub {
+  color: #64748b;
+}
+
+[data-theme="light"] .tfanal-table th {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .tfanal-table td {
+  border-bottom: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .tfanal-table code {
+  color: #0284c7 !important;
+  background: #f1f5f9 !important;
+}
+
+[data-theme="light"] .tfanal-table tr:hover td {
+  background: #f8fafc !important;
+}
+
+[data-theme="light"] .pcap-proto-pill {
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #bfdbfe !important;
+}
+
+[data-theme="light"] .tfanal-risk-badge.normal {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+[data-theme="light"] .tfanal-risk-badge.warning {
+  background: #fffbeb !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+}
+
+[data-theme="light"] .tfanal-risk-badge.critical {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+  border-color: #fecaca !important;
+}
+
+[data-theme="light"] .tfanal-status-badge.active {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+/* Packet Capture Cards & Boxes */
+[data-theme="light"] .pcap-card,
+[data-theme="light"] .pcap-stat-card,
+[data-theme="light"] .pcap-chart-box,
+[data-theme="light"] .pcap-table-box {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .pcap-header-flex {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .pcap-header-title h3,
+[data-theme="light"] .pcap-stat-metric,
+[data-theme="light"] .pcap-chart-title {
+  color: #1e293b;
+}
+
+[data-theme="light"] .pcap-header-title p,
+[data-theme="light"] .pcap-stat-title {
+  color: #475569;
+}
+
+[data-theme="light"] .pcap-table th {
+  background: #f1f5f9;
+  color: #334155;
+  border-bottom-color: #cbd5e1;
+}
+
+[data-theme="light"] .pcap-table td {
+  border-bottom-color: #f1f5f9;
+  color: #1e293b;
+}
+
+/* Reports Cards & Boxes */
+[data-theme="light"] .rep-card,
+[data-theme="light"] .rep-stat-card,
+[data-theme="light"] .rep-chart-box,
+[data-theme="light"] .rep-timeline-box,
+[data-theme="light"] .rep-category-card,
+[data-theme="light"] .rep-export-bar,
+[data-theme="light"] .rep-table-box {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .rep-header-flex {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .rep-header-title h3,
+[data-theme="light"] .rep-stat-metric,
+[data-theme="light"] .rep-chart-title,
+[data-theme="light"] .rep-category-title,
+[data-theme="light"] .rep-timeline-text {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .rep-header-title p,
+[data-theme="light"] .rep-stat-title,
+[data-theme="light"] .rep-category-desc,
+[data-theme="light"] .rep-timeline-time {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .rep-table th {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] .rep-table td {
+  border-bottom: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .rep-table code {
+  color: #0284c7 !important;
+  background: #f1f5f9 !important;
+}
+
+[data-theme="light"] .rep-table tr:hover td {
+  background: #f8fafc !important;
+}
+
+[data-theme="light"] .rep-status-badge.completed {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+[data-theme="light"] .rep-format-badge {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Analytics Cards & Boxes */
+[data-theme="light"] .anlt-card,
+[data-theme="light"] .anlt-stat-card,
+[data-theme="light"] .anlt-chart-box,
+[data-theme="light"] .anlt-insight-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .anlt-header-flex {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .anlt-header-title h3,
+[data-theme="light"] .anlt-stat-metric,
+[data-theme="light"] .anlt-chart-title,
+[data-theme="light"] .anlt-insight-value {
+  color: #1e293b;
+}
+
+[data-theme="light"] .anlt-header-title p,
+[data-theme="light"] .anlt-stat-title,
+[data-theme="light"] .anlt-insight-label {
+  color: #475569;
+}
+
+/* Security Analyst Dashboard Cards & Table */
+[data-theme="light"] .soc-dash-card,
+[data-theme="light"] .soc-dash-stat-card,
+[data-theme="light"] .soc-dash-table-wrapper {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .soc-dash-card-header {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .soc-dash-card-title,
+[data-theme="light"] .soc-dash-stat-metric {
+  color: #1e293b;
+}
+
+[data-theme="light"] .soc-dash-card-subtitle,
+[data-theme="light"] .soc-dash-stat-title {
+  color: #475569;
+}
+
+[data-theme="light"] .soc-dash-table th {
+  background: #f1f5f9;
+  color: #334155;
+  border-bottom-color: #cbd5e1;
+}
+
+[data-theme="light"] .soc-dash-table td {
+  border-bottom-color: #f1f5f9;
+  color: #1e293b;
+}
+
+[data-theme="light"] .soc-dash-table tr:hover {
+  background: #f8fafc;
+}
+
+[data-theme="light"] .soc-dash-pagination {
+  border-top-color: #e2e8f0;
+  color: #475569;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}

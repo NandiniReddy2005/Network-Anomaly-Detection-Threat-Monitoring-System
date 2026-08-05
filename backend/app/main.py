@@ -31,18 +31,17 @@ async def lifespan(app: FastAPI):
             result_users = await session.execute(select(User))
             users = result_users.scalars().all()
             if not users:
-                analyst_user = User(
-                    email="analyst@gmail.com",
-                    password_hash=hash_password("analyst123"),
-                    role="analyst"
-                )
-                admin_user = User(
-                    email="sec_admin@gmail.com",
-                    password_hash=hash_password("admin123"),
-                    role="admin"
-                )
-                session.add(analyst_user)
-                session.add(admin_user)
+                default_users = [
+                    User(email="sec_admin@gmail.com", password_hash=hash_password("admin123"), role="admin"),
+                    User(email="admin_lead@netshield.io", password_hash=hash_password("admin123"), role="admin"),
+                    User(email="sec_director@netshield.io", password_hash=hash_password("admin123"), role="admin"),
+                    User(email="sys_admin2@netshield.io", password_hash=hash_password("admin123"), role="admin"),
+                    User(email="analyst@gmail.com", password_hash=hash_password("analyst123"), role="analyst"),
+                    User(email="newuser@gmail.com", password_hash=hash_password("analyst123"), role="analyst"),
+                    User(email="tier2_analyst@netshield.io", password_hash=hash_password("analyst123"), role="analyst"),
+                    User(email="soc_analyst1@netshield.io", password_hash=hash_password("analyst123"), role="analyst"),
+                ]
+                session.add_all(default_users)
                 await session.commit()
 
             result_incidents = await session.execute(select(AdminIncident))
@@ -138,10 +137,14 @@ app.add_middleware(
 
 # Include routers
 app.include_router(telemetry.router)
+app.include_router(telemetry.logs_router)
+app.include_router(telemetry.events_router)
 app.include_router(auth_routes.router)
 app.include_router(dashboard.router)
 app.include_router(dashboard.reports_router)
 app.include_router(dashboard.settings_router)
+app.include_router(dashboard.audit_router)
+app.include_router(dashboard.threats_router)
 app.include_router(analyst.router)
 
 @app.get("/")
