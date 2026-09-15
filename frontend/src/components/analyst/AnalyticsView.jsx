@@ -1,17 +1,35 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { RefreshCw } from "lucide-react";
+import {
+  RefreshCw,
+  BarChart3,
+  ShieldAlert,
+  Cpu,
+  Lock,
+  Zap,
+  Globe,
+  Award,
+  Activity,
+  CheckCircle2,
+  Filter,
+  Calendar,
+  Layers,
+  Radio,
+  PieChart as PieIcon,
+  TrendingUp,
+  UserCheck,
+  Database,
+  Crosshair,
+} from "lucide-react";
 import {
   ResponsiveContainer,
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
   BarChart,
   Bar,
   PieChart,
   Pie,
   Cell,
+  AreaChart,
+  Area,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -22,306 +40,528 @@ import {
 import LoadingSpinner from "../LoadingSpinner";
 import { fetchApi } from "../../utils/api";
 import { useTheme } from "../../context/ThemeContext";
+import { useIncidents } from "../../context/IncidentContext";
 
 export default function AnalyticsView() {
   const { isDark } = useTheme();
-  const [analyticsData, setAnalyticsData] = useState(null);
+
+  // Analyst Session State
+  const [currentAnalyst, setCurrentAnalyst] = useState("security@gmail.com");
+
+  // Dynamic Controls State (Time Horizon: 7d, 15d, 30d)
+  const [timeRange, setTimeRange] = useState("7d");
+  const [severityFilter, setSeverityFilter] = useState("ALL");
+
+  // PostgreSQL Dynamic Chart Data States (From GET /api/analytics/charts & GET /api/analytics/threat-types)
+  const [totalIncidents, setTotalIncidents] = useState(0);
+  const [severityCounts, setSeverityCounts] = useState([]);
+  const [datasetCounts, setDatasetCounts] = useState([]);
+  const [threatVectorBreakdown, setThreatVectorBreakdown] = useState([]);
+  const [timeSeriesData, setTimeSeriesData] = useState([]);
+
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
   const [analyticsError, setAnalyticsError] = useState(null);
+  const [lastSyncTime, setLastSyncTime] = useState("");
 
-  const fetchAnalytics = useCallback(async () => {
-    setLoadingAnalytics(true);
-    setAnalyticsError(null);
+  // Retrieve Logged-In User from LocalStorage on mount & login restoration
+  useEffect(() => {
     try {
-      const res = await fetchApi("/api/analyst/analytics");
-      setAnalyticsData(res.data || res);
-    } catch (err) {
-      setAnalyticsError("Unable to compute heuristic analytics.");
-    } finally {
-      setLoadingAnalytics(false);
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("netshield_current_user") || localStorage.getItem("user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.email) {
+            setCurrentAnalyst(parsed.email);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("User session retrieval error:", e);
     }
   }, []);
 
+  // Fetch Live PostgreSQL Analytics Suite Data
+  const fetchAnalyticsSuite = useCallback(
+    async (isSilent = false) => {
+      if (!isSilent) setLoadingAnalytics(true);
+      setAnalyticsError(null);
+      try {
+        const userEmail = currentAnalyst || "security@gmail.com";
+        const chartsUrl = `/api/analytics/charts?user_id=${encodeURIComponent(userEmail)}&time_range=${encodeURIComponent(timeRange)}`;
+
+        const res = await fetchApi(chartsUrl, {
+          headers: { "X-User-Email": userEmail },
+        });
+
+        if (res && res.status === "success") {
+          if (res.total_incidents !== undefined) {
+            setTotalIncidents(res.total_incidents);
+          }
+          if (res.severity_counts) {
+            setSeverityCounts(res.severity_counts);
+          }
+          if (res.dataset_counts) {
+            setDatasetCounts(res.dataset_counts);
+          }
+          if (res.threat_vector_breakdown) {
+            setThreatVectorBreakdown(res.threat_vector_breakdown);
+          }
+          if (res.time_series) {
+            setTimeSeriesData(res.time_series);
+          }
+        }
+
+        // Also fetch GET /api/analytics/threat-types for backup sync
+        const threatTypesUrl = `/api/analytics/threat-types?user_id=${encodeURIComponent(userEmail)}`;
+        const ttRes = await fetchApi(threatTypesUrl, {
+          headers: { "X-User-Email": userEmail },
+        });
+        if (ttRes && ttRes.data && ttRes.data.length > 0) {
+          setThreatVectorBreakdown(ttRes.data);
+        }
+
+        setLastSyncTime(new Date().toLocaleTimeString());
+      } catch (err) {
+        console.warn("Failed to fetch PostgreSQL analytics charts from backend:", err);
+        if (!isSilent) setAnalyticsError("Unable to compute PostgreSQL threat analytics suite.");
+      } finally {
+        if (!isSilent) setLoadingAnalytics(false);
+      }
+    },
+    [currentAnalyst, timeRange]
+  );
+
+  // Initial fetch and 3-second dynamic polling loop
   useEffect(() => {
-    fetchAnalytics();
-  }, [fetchAnalytics]);
+    fetchAnalyticsSuite(false);
 
-  const analytics = analyticsData || {};
-  const categories = analytics.top_attack_categories || [
-    { category: "Ransomware & Malware", count: 420, percentage: "35.0%" },
-    { category: "DDoS Volumetric", count: 310, percentage: "25.8%" },
-    { category: "SQL Injection & XSS", count: 240, percentage: "20.0%" },
-    { category: "Data Exfiltration", count: 120, percentage: "10.0%" },
-    { category: "Credential Brute Force", count: 70, percentage: "5.8%" },
-    { category: "Port & Vulnerability Scanning", count: 40, percentage: "3.4%" },
-  ];
-  const trend = analytics.threat_trend_chart || [
-    { day: "Mon", attacks: 120, anomalyScore: 42 },
-    { day: "Tue", attacks: 240, anomalyScore: 68 },
-    { day: "Wed", attacks: 180, anomalyScore: 55 },
-    { day: "Thu", attacks: 390, anomalyScore: 89 },
-    { day: "Fri", attacks: 310, anomalyScore: 74 },
-    { day: "Sat", attacks: 150, anomalyScore: 48 },
-    { day: "Sun", attacks: 210, anomalyScore: 60 },
+    const interval = setInterval(() => {
+      fetchAnalyticsSuite(true);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [fetchAnalyticsSuite]);
+
+  const { incidents } = useIncidents();
+  const incidentData = incidents || [];
+
+  // Derive live dynamic metrics from IncidentContext
+  const liveTotalIncidents = incidentData.length;
+
+  const liveSeverityCounts = [
+    {
+      severity: "CRITICAL",
+      count: incidentData.filter((i) => String(i.severity || i.threatSeverity || "").toUpperCase() === "CRITICAL").length,
+      color: "#ef4444",
+    },
+    {
+      severity: "HIGH",
+      count: incidentData.filter((i) => String(i.severity || i.threatSeverity || "").toUpperCase() === "HIGH").length,
+      color: "#f97316",
+    },
+    {
+      severity: "MEDIUM",
+      count: incidentData.filter((i) => String(i.severity || i.threatSeverity || "").toUpperCase() === "MEDIUM").length,
+      color: "#eab308",
+    },
+    {
+      severity: "LOW",
+      count: incidentData.filter((i) => String(i.severity || i.threatSeverity || "").toUpperCase() === "LOW").length,
+    },
   ];
 
-  const protoData = [
-    { protocol: "TCP", volume: 450 },
-    { protocol: "UDP", volume: 320 },
-    { protocol: "HTTP/2", volume: 280 },
-    { protocol: "DNS", volume: 140 },
-    { protocol: "SSH", volume: 60 },
-    { protocol: "TLS 1.3", volume: 210 },
+  const liveDatasetCounts = [
+    {
+      dataset_engine: "UNSW-NB15",
+      count: incidentData.filter((i) => {
+        const src = String(i.detection_source || i.threat_vector || i.threatType || "").toUpperCase();
+        return src.includes("UNSW");
+      }).length,
+      color: "#3b82f6",
+    },
+    {
+      dataset_engine: "CICIDS2017",
+      count: incidentData.filter((i) => {
+        const src = String(i.detection_source || i.threat_vector || i.threatType || "").toUpperCase();
+        return src.includes("CICIDS");
+      }).length,
+      color: "#a855f7",
+    },
+    {
+      dataset_engine: "AbuseIPDB",
+      count: incidentData.filter((i) => {
+        const src = String(i.detection_source || i.threat_vector || i.threatType || "").toUpperCase();
+        return src.includes("ABUSE");
+      }).length,
+      color: "#06b6d4",
+    },
   ];
 
-  const topThreats = [
-    { type: "DDoS Volumetric Attack", severity: "Critical", count: 1420, confidence: "99.8%", status: "Active", lastDetected: "2 mins ago" },
-    { type: "SQL Injection Attempt", severity: "High", count: 380, confidence: "98.4%", status: "Monitoring", lastDetected: "14 mins ago" },
-    { type: "Cross-Site Scripting (XSS)", severity: "Medium", count: 210, confidence: "96.2%", status: "Resolved", lastDetected: "1 hour ago" },
-    { type: "SSH Password Spraying", severity: "High", count: 540, confidence: "99.1%", status: "Active", lastDetected: "25 mins ago" },
-    { type: "DNS Tunneling Anomaly", severity: "Medium", count: 95, confidence: "94.5%", status: "Monitoring", lastDetected: "2 hours ago" },
-    { type: "Port Scanning Probe", severity: "Low", count: 1200, confidence: "92.0%", status: "Resolved", lastDetected: "4 hours ago" },
-  ];
+  const computeThreatVectorBreakdown = (items) => {
+    const categories = {
+      "DoS / SYN Flood": 0,
+      "PortScan / Recon": 0,
+      "Brute Force / SQLi": 0,
+      "Tor Exit / Intel": 0,
+      "Exploits / Shellcode": 0,
+      "Fuzzers / Payload": 0,
+      "Malicious Scanner": 0,
+    };
+
+    items.forEach((item) => {
+      const type = String(item.threat_vector || item.threatType || item.details || "").toUpperCase();
+      if (type.includes("DOS") || type.includes("SYN") || type.includes("FLOOD")) categories["DoS / SYN Flood"]++;
+      else if (type.includes("SCAN") || type.includes("RECON") || type.includes("PORT")) categories["PortScan / Recon"]++;
+      else if (type.includes("BRUTE") || type.includes("SQL") || type.includes("WEB") || type.includes("XSS")) categories["Brute Force / SQLi"]++;
+      else if (type.includes("TOR") || type.includes("INTEL") || type.includes("ABUSE")) categories["Tor Exit / Intel"]++;
+      else if (type.includes("EXPLOIT") || type.includes("SHELL") || type.includes("INFILTRATION")) categories["Exploits / Shellcode"]++;
+      else if (type.includes("FUZZER") || type.includes("PAYLOAD") || type.includes("WORM")) categories["Fuzzers / Payload"]++;
+      else categories["Malicious Scanner"]++;
+    });
+
+    const colors = ["#ef4444", "#f97316", "#a855f7", "#06b6d4", "#3b82f6", "#10b981", "#eab308"];
+    return Object.entries(categories).map(([category, count], idx) => ({
+      category,
+      count,
+      color: colors[idx % colors.length],
+    }));
+  };
+
+  const liveThreatVectorBreakdown = computeThreatVectorBreakdown(incidentData);
+
+  const activeTotalIncidents = incidentData.length > 0 ? liveTotalIncidents : totalIncidents;
+  const activeSeverityCounts = incidentData.length > 0 ? liveSeverityCounts : severityCounts;
+  const activeDatasetCounts = incidentData.length > 0 ? liveDatasetCounts : datasetCounts;
+  const activeThreatVectorBreakdown = incidentData.length > 0 ? liveThreatVectorBreakdown : threatVectorBreakdown;
+
+  // Filtered severity counts logic
+  const filteredSeverityCounts = severityFilter === "ALL"
+    ? activeSeverityCounts
+    : activeSeverityCounts.filter((item) => item.severity === severityFilter);
 
   return (
-    <div key="tab-analytics" className="anlt-container">
-      <div className="anlt-card">
+    <div key="tab-analytics" className="anlt-container" style={{ width: "100%", maxWidth: "100%", minWidth: "100%", boxSizing: "border-box" }}>
+      <div className="anlt-card" style={{ width: "100%", maxWidth: "100%", minWidth: "100%", boxSizing: "border-box" }}>
         {/* Header Section */}
         <div className="anlt-header-flex">
           <div className="anlt-header-title">
-            <h3>Security Analytics &amp; AI Insights</h3>
-            <p>Real-time neural inference, heuristic anomaly scoring, and machine learning threat matrix analytics.</p>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              Dynamic PostgreSQL Analytics Dashboard
+            </h3>
+            <p style={{ marginTop: "0.25rem" }}>
+              Full 4-Chart Visual Suite: Severity distribution, dataset engine breakdown, specific threat vector subtypes, and dynamic historical trend plots.
+            </p>
           </div>
-          <div className="anlt-header-actions">
-            <span className="anlt-badge">AI Inference Engine Active</span>
-            <button className="ns-btn-gradient small" onClick={fetchAnalytics}>
-              <RefreshCw size={14} style={{ marginRight: "4px" }} /> Refresh Analytics
-            </button>
+
+        </div>
+
+        {/* Analytics Dynamic Filter Toolbar */}
+        <div
+          style={{
+            marginBottom: "1.5rem",
+            padding: "0.85rem 1.1rem",
+            backgroundColor: isDark ? "rgba(30, 41, 59, 0.7)" : "#f8fafc",
+            border: isDark ? "1px solid #334155" : "1px solid #cbd5e1",
+            borderRadius: "10px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "1rem",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Filter size={16} style={{ color: "#38bdf8" }} />
+            <span style={{ fontSize: "0.85rem", fontWeight: "700", color: isDark ? "#f8fafc" : "#0f172a" }}>
+              Dynamic Controls &amp; Horizon Toggles:
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+            {/* Time Horizon Selector (7, 15, 30 Days) */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <Calendar size={14} style={{ color: "#a855f7" }} />
+              <span style={{ fontSize: "0.78rem", fontWeight: "600", color: isDark ? "#cbd5e1" : "#475569" }}>Time Horizon:</span>
+              <div style={{ display: "flex", gap: "0.2rem", backgroundColor: isDark ? "#0f172a" : "#e2e8f0", padding: "0.15rem", borderRadius: "6px" }}>
+                {[
+                  { label: "Last 7 Days", value: "7d" },
+                  { label: "Last 15 Days", value: "15d" },
+                  { label: "Last 30 Days", value: "30d" },
+                ].map((rng) => (
+                  <button
+                    key={rng.value}
+                    onClick={() => setTimeRange(rng.value)}
+                    style={{
+                      padding: "0.25rem 0.65rem",
+                      borderRadius: "4px",
+                      fontSize: "0.75rem",
+                      fontWeight: "700",
+                      backgroundColor: timeRange === rng.value ? "#a855f7" : "transparent",
+                      color: timeRange === rng.value ? "#ffffff" : isDark ? "#94a3b8" : "#475569",
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {rng.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Severity Filter Dropdown */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <span style={{ fontSize: "0.78rem", fontWeight: "600", color: isDark ? "#cbd5e1" : "#475569" }}>Severity Filter:</span>
+              <select
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value)}
+                style={{
+                  padding: "0.35rem 0.65rem",
+                  borderRadius: "6px",
+                  backgroundColor: isDark ? "#0f172a" : "#ffffff",
+                  border: isDark ? "1px solid #334155" : "1px solid #cbd5e1",
+                  color: isDark ? "#f8fafc" : "#0f172a",
+                  fontSize: "0.78rem",
+                  fontWeight: "600",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="ALL">All Severities</option>
+                <option value="CRITICAL">Critical Only</option>
+                <option value="HIGH">High Only</option>
+                <option value="MEDIUM">Medium Only</option>
+                <option value="LOW">Low Only</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* KPI Summary Cards */}
         {loadingAnalytics ? (
-          <LoadingSpinner text="Computing neural analytics & threat trends..." />
+          <LoadingSpinner text="Querying PostgreSQL incidents table & compiling 4-chart suite..." />
         ) : analyticsError ? (
-          <div style={{ padding: "1rem", color: "#f87171", textAlign: "center" }}>
+          <div style={{ padding: "1.5rem", color: "#f87171", textAlign: "center" }}>
             {analyticsError}
-            <button onClick={fetchAnalytics} style={{ marginLeft: "10px" }} className="ns-btn-gradient small">Retry</button>
+            <button onClick={() => fetchAnalyticsSuite(false)} style={{ marginLeft: "10px" }} className="ns-btn-gradient small">
+              Retry Connection
+            </button>
           </div>
         ) : (
           <>
-            <div className="anlt-kpi-grid">
-              <div className="anlt-stat-card purple">
-                <span className="anlt-stat-title">Total Events Analyzed</span>
-                <span className="anlt-stat-metric">{analytics.daily_attacks ? (analytics.daily_attacks * 1280).toLocaleString() : "1.48M"}</span>
-                <span className="anlt-stat-sub">Past 24h Buffer</span>
+            {/* Live Aggregate KPI Cards */}
+            <div className="anlt-kpi-grid" style={{ marginBottom: "1.5rem" }}>
+              {/* Total Incidents Card */}
+              <div className="anlt-stat-card blue" style={{ borderLeft: "4px solid #3b82f6" }}>
+                <span className="anlt-stat-title">Total Threat Incidents</span>
+                <span className="anlt-stat-metric" style={{ color: "#60a5fa" }}>
+                  {activeTotalIncidents}
+                </span>
+                <span className="anlt-stat-sub">Logged under {currentAnalyst}</span>
               </div>
-              <div className="anlt-stat-card green">
-                <span className="anlt-stat-title">Threat Detection Accuracy</span>
-                <span className="anlt-stat-metric">{analytics.detection_accuracy || "99.4%"}</span>
-                <span className="anlt-stat-sub">Neural Precision</span>
+
+              {/* Critical Severity Count */}
+              <div className="anlt-stat-card red" style={{ borderLeft: "4px solid #ef4444" }}>
+                <span className="anlt-stat-title">Critical Threats</span>
+                <span className="anlt-stat-metric" style={{ color: "#f87171" }}>
+                  {activeSeverityCounts.find((s) => s.severity === "CRITICAL")?.count || 0}
+                </span>
+                <span className="anlt-stat-sub">Immediate Null-Route Firewalled</span>
               </div>
-              <div className="anlt-stat-card cyan">
-                <span className="anlt-stat-title">AI Confidence Score</span>
-                <span className="anlt-stat-metric">98.7%</span>
-                <span className="anlt-stat-sub">Heuristic Weight</span>
+
+              {/* High Severity Count */}
+              <div className="anlt-stat-card orange" style={{ borderLeft: "4px solid #f97316" }}>
+                <span className="anlt-stat-title">High Threats</span>
+                <span className="anlt-stat-metric" style={{ color: "#fb923c" }}>
+                  {activeSeverityCounts.find((s) => s.severity === "HIGH")?.count || 0}
+                </span>
+                <span className="anlt-stat-sub">Active Triage / Deep Inspection</span>
               </div>
-              <div className="anlt-stat-card blue">
-                <span className="anlt-stat-title">Average Response Time</span>
-                <span className="anlt-stat-metric">42 ms</span>
-                <span className="anlt-stat-sub">Inference Latency</span>
-              </div>
-              <div className="anlt-stat-card red">
-                <span className="anlt-stat-title">High-Risk Events</span>
-                <span className="anlt-stat-metric">{analytics.daily_attacks || 14}</span>
-                <span className="anlt-stat-sub">Action Required</span>
-              </div>
-              <div className="anlt-stat-card green">
-                <span className="anlt-stat-title">Overall Network Health</span>
-                <span className="anlt-stat-metric" style={{ fontSize: "1.1rem", color: "#10B981" }}>Optimal (99.8%)</span>
-                <span className="anlt-stat-sub">Security Posture</span>
+
+              {/* Medium & Low Threats Count */}
+              <div className="anlt-stat-card green" style={{ borderLeft: "4px solid #10b981" }}>
+                <span className="anlt-stat-title">Medium &amp; Low Threats</span>
+                <span className="anlt-stat-metric" style={{ color: "#34d399" }}>
+                  {(activeSeverityCounts.find((s) => s.severity === "MEDIUM")?.count || 0) +
+                    (activeSeverityCounts.find((s) => s.severity === "LOW")?.count || 0)}
+                </span>
+                <span className="anlt-stat-sub">Low Priority / Routine Monitoring</span>
               </div>
             </div>
 
-            {/* 4 Threat Analytics Visualizations */}
-            <div className="anlt-charts-grid">
-              {/* Chart 1: AreaChart (Threat Activity Over Time) */}
-              <div className="anlt-chart-box">
-                <h4 className="anlt-chart-title">Threat Activity Intercepted Over Time</h4>
-                <ResponsiveContainer key="anlt-area-responsive-container" width="100%" height={200}>
-                  <AreaChart key="anlt-area-chart" data={trend}>
+            {/* FULL 4-CHART VISUAL DASHBOARD SUITE */}
+            <div style={{ width: "100%", minWidth: "100%", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              {/* ROW 1: STRICT 50/50 GRID FOR CHART 1 & CHART 2 */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
+                  gap: "1.5rem",
+                  width: "100%",
+                  minWidth: "100%",
+                  boxSizing: "border-box",
+                }}
+              >
+                {/* CHART 1: SEVERITY DISTRIBUTION BAR CHART (DYNAMIC) */}
+                <div className="anlt-chart-box" style={{ width: "100%", minWidth: "100%", boxSizing: "border-box" }}>
+                  <h4 className="anlt-chart-title" style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "1rem" }}>
+                    <BarChart3 size={16} style={{ color: "#ef4444" }} />
+                    1. Severity Distribution Bar Chart (Dynamic)
+                  </h4>
+                  <ResponsiveContainer width="100%" minWidth="100%" height={280}>
+                    <BarChart data={filteredSeverityCounts}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.06)" : "#cbd5e1"} />
+                      <XAxis dataKey="severity" stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} />
+                      <YAxis stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} allowDecimals={false} />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div
+                                style={{
+                                  padding: "0.6rem 0.85rem",
+                                  backgroundColor: isDark ? "#0f172a" : "#ffffff",
+                                  border: isDark ? "1px solid #334155" : "1px solid #cbd5e1",
+                                  borderRadius: "8px",
+                                  color: isDark ? "#f8fafc" : "#1e293b",
+                                  boxShadow: "0 10px 25px -5px rgba(0,0,0,0.5)",
+                                }}
+                              >
+                                <p style={{ fontWeight: "700", margin: 0, color: data.color || (isDark ? "#f8fafc" : "#0f172a"), fontSize: "0.9rem" }}>
+                                  {data.severity}
+                                </p>
+                                <p style={{ margin: "4px 0 0 0", fontSize: "0.82rem", color: isDark ? "#cbd5e1" : "#475569" }}>
+                                  Incidents Count : <span style={{ fontWeight: "700", color: "#38bdf8" }}>{data.count}</span>
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "11px", color: isDark ? "#94a3b8" : "#334155" }} />
+                      <Bar dataKey="count" name="Incidents Count" radius={[4, 4, 0, 0]} isAnimationActive={true}>
+                        {filteredSeverityCounts.map((entry, index) => (
+                          <Cell key={`sev-cell-${index}`} fill={entry.color || "#3b82f6"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* CHART 2: DATASET ENGINE BREAKDOWN CHART (DYNAMIC DONUT/PIE) */}
+                <div className="anlt-chart-box" style={{ width: "100%", minWidth: "100%", boxSizing: "border-box" }}>
+                  <h4 className="anlt-chart-title" style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "1rem" }}>
+                    <PieIcon size={16} style={{ color: "#a855f7" }} />
+                    2. Dataset Engine Breakdown Chart (Dynamic Volume)
+                  </h4>
+                  <ResponsiveContainer width="100%" minWidth="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={activeDatasetCounts}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        paddingAngle={4}
+                        dataKey="count"
+                        nameKey="dataset_engine"
+                        label={({ dataset_engine, count }) => `${dataset_engine}: ${count}`}
+                        isAnimationActive={true}
+                      >
+                        {activeDatasetCounts.map((entry, index) => (
+                          <Cell key={`ds-cell-${index}`} fill={entry.color || "#3b82f6"} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: isDark ? "#0f172a" : "#ffffff",
+                          borderColor: isDark ? "#334155" : "#cbd5e1",
+                          borderRadius: "8px",
+                          color: isDark ? "#f8fafc" : "#1e293b",
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "11px", color: isDark ? "#94a3b8" : "#334155" }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* CHART 3: SPECIFIC THREAT VECTOR BREAKDOWN (NEW HORIZONTAL BAR CHART) */}
+              <div className="anlt-chart-box" style={{ width: "100%", minWidth: "100%", boxSizing: "border-box" }}>
+                <h4 className="anlt-chart-title" style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "1rem" }}>
+                  <Crosshair size={16} style={{ color: "#f97316" }} />
+                  3. Specific Threat Vector Breakdown (UNSW-NB15 &amp; CICIDS2017)
+                </h4>
+                <ResponsiveContainer width="100%" minWidth="100%" height={280}>
+                  <BarChart data={activeThreatVectorBreakdown} layout="vertical">
                     <defs>
-                      <linearGradient id="anltThreatAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                      <linearGradient id="vectorGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#f97316" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#a855f7" stopOpacity={0.9} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.05)" : "#cbd5e1"} />
-                    <XAxis dataKey="day" stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} />
-                    <YAxis stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: isDark ? "#0f172a" : "#ffffff", borderColor: isDark ? "#334155" : "#cbd5e1", borderRadius: "8px", color: isDark ? "#f8fafc" : "#1e293b" }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.06)" : "#cbd5e1"} />
+                    <XAxis type="number" stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} allowDecimals={false} />
+                    <YAxis dataKey="category" type="category" stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} width={160} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: isDark ? "#0f172a" : "#ffffff",
+                        borderColor: isDark ? "#334155" : "#cbd5e1",
+                        borderRadius: "8px",
+                        color: isDark ? "#f8fafc" : "#1e293b",
+                      }}
+                    />
                     <Legend wrapperStyle={{ fontSize: "11px", color: isDark ? "#94a3b8" : "#334155" }} />
-                    <Area type="monotone" name="Attacks Intercepted" dataKey="attacks" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#anltThreatAreaGrad)" isAnimationActive={true} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Chart 2: LineChart (Anomaly Score Trends) */}
-              <div className="anlt-chart-box">
-                <h4 className="anlt-chart-title">Anomaly Score Trends (0 - 100 Index)</h4>
-                <ResponsiveContainer key="anlt-line-responsive-container" width="100%" height={200}>
-                  <LineChart key="anlt-line-chart" data={trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.05)" : "#cbd5e1"} />
-                    <XAxis dataKey="day" stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} />
-                    <YAxis stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} domain={[0, 100]} />
-                    <Tooltip contentStyle={{ backgroundColor: isDark ? "#0f172a" : "#ffffff", borderColor: isDark ? "#334155" : "#cbd5e1", borderRadius: "8px", color: isDark ? "#f8fafc" : "#1e293b" }} />
-                    <Legend wrapperStyle={{ fontSize: "11px", color: isDark ? "#94a3b8" : "#334155" }} />
-                    <Line type="monotone" name="Anomaly Index" dataKey="anomalyScore" stroke="#F59E0B" strokeWidth={2.5} dot={{ fill: "#3B82F6", r: 4 }} isAnimationActive={true} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Chart 3: PieChart (Attack Category Distribution) */}
-              <div className="anlt-chart-box">
-                <h4 className="anlt-chart-title">Attack Category Distribution</h4>
-                <ResponsiveContainer key="anlt-pie-responsive-container" width="100%" height={200}>
-                  <PieChart key="anlt-pie-chart">
-                    <Pie
-                      data={categories.map((c) => ({ name: c.category, value: c.count || 10 }))}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={65}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {["#EF4444", "#F59E0B", "#3B82F6", "#8B5CF6", "#06B6D4", "#10B981"].map((color, i) => (
-                        <Cell key={i} fill={color} />
+                    <Bar dataKey="count" name="Detected Attack Subtypes" fill="url(#vectorGrad)" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={true}>
+                      {activeThreatVectorBreakdown.map((entry, index) => (
+                        <Cell key={`vec-cell-${index}`} fill={entry.color || "#f97316"} />
                       ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: isDark ? "#0f172a" : "#ffffff", borderColor: isDark ? "#334155" : "#cbd5e1", borderRadius: "8px", color: isDark ? "#f8fafc" : "#1e293b" }} />
-                    <Legend wrapperStyle={{ fontSize: "10px", color: isDark ? "#94a3b8" : "#334155" }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Chart 4: BarChart (Protocol Distribution) */}
-              <div className="anlt-chart-box">
-                <h4 className="anlt-chart-title">Protocol Telemetry Volume</h4>
-                <ResponsiveContainer key="anlt-bar-responsive-container" width="100%" height={200}>
-                  <BarChart key="anlt-bar-chart" data={protoData}>
-                    <defs>
-                      <linearGradient id="anltProtoBarGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.9} />
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.5} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.05)" : "#cbd5e1"} />
-                    <XAxis dataKey="protocol" stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} />
-                    <YAxis stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: isDark ? "#0f172a" : "#ffffff", borderColor: isDark ? "#334155" : "#cbd5e1", borderRadius: "8px", color: isDark ? "#f8fafc" : "#1e293b" }} />
-                    <Legend wrapperStyle={{ fontSize: "11px", color: isDark ? "#94a3b8" : "#334155" }} />
-                    <Bar dataKey="volume" name="Protocol Flow Volume" fill="url(#anltProtoBarGrad)" radius={[4, 4, 0, 0]} isAnimationActive={true} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </div>
 
-            {/* AI Security Insights Panel */}
-            <div className="anlt-insights-grid">
-              <div className="anlt-insight-card">
-                <span className="anlt-insight-label">Top Threat Detected</span>
-                <span className="anlt-insight-value" style={{ color: "#F87171" }}>DDoS Volumetric Attack</span>
-              </div>
-              <div className="anlt-insight-card">
-                <span className="anlt-insight-label">Most Targeted Asset</span>
-                <span className="anlt-insight-value">Database Cluster (10.0.4.12)</span>
-              </div>
-              <div className="anlt-insight-card">
-                <span className="anlt-insight-label">Highest Risk Protocol</span>
-                <span className="anlt-insight-value">HTTP/2 (Port 443)</span>
-              </div>
-              <div className="anlt-insight-card">
-                <span className="anlt-insight-label">Peak Attack Time</span>
-                <span className="anlt-insight-value">14:30 - 15:15 UTC</span>
-              </div>
-              <div className="anlt-insight-card">
-                <span className="anlt-insight-label">AI Recommendation</span>
-                <span className="anlt-insight-value" style={{ color: "#34D399" }}>Apply Rate Limit on /api/v1/auth</span>
-              </div>
-              <div className="anlt-insight-card">
-                <span className="anlt-insight-label">Current Security Posture</span>
-                <span className="anlt-insight-value" style={{ color: "#60A5FA" }}>Elevated Defense (Shield Active)</span>
-              </div>
-            </div>
-
-            {/* Analytics Event Timeline & Top Threats Table */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1.5rem" }}>
-              {/* Top Threats Table */}
-              <div className="anlt-table-box" style={{ gridColumn: "span 2" }}>
-                <h4 className="anlt-chart-title" style={{ marginBottom: "1rem" }}>Top Threat Intelligence Vector Log</h4>
-                <table className="anlt-table">
-                  <thead>
-                    <tr>
-                      <th>Threat Type</th>
-                      <th>Severity</th>
-                      <th>Detection Count</th>
-                      <th>Confidence</th>
-                      <th>Status</th>
-                      <th>Last Detected</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topThreats.map((th, i) => {
-                      const sevLower = th.severity.toLowerCase();
-                      let sevBadge = <span className="anlt-severity-badge low">Low</span>;
-                      if (sevLower === "critical") sevBadge = <span className="anlt-severity-badge critical">Critical</span>;
-                      else if (sevLower === "high") sevBadge = <span className="anlt-severity-badge high">High</span>;
-                      else if (sevLower === "medium") sevBadge = <span className="anlt-severity-badge medium">Medium</span>;
-
-                      const statusLower = th.status.toLowerCase();
-                      let statusBadge = <span className="anlt-status-badge active">Active</span>;
-                      if (statusLower === "monitoring") statusBadge = <span className="anlt-status-badge monitoring">Monitoring</span>;
-                      else if (statusLower === "resolved") statusBadge = <span className="anlt-status-badge resolved">Resolved</span>;
-
-                      return (
-                        <tr key={i}>
-                          <td><strong>{th.type}</strong></td>
-                          <td>{sevBadge}</td>
-                          <td>{th.count.toLocaleString()}</td>
-                          <td><code>{th.confidence}</code></td>
-                          <td>{statusBadge}</td>
-                          <td>{th.lastDetected}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Analytics Timeline */}
-              <div className="anlt-timeline-box" style={{ gridColumn: "span 1" }}>
-                <h4 className="anlt-chart-title" style={{ marginBottom: "0.25rem" }}>Analytics Event Audit Stream</h4>
-                <div className="anlt-timeline-item">
-                  <span className="anlt-timeline-time">09:42 AM</span>
-                  <span className="anlt-timeline-text"><strong>Threat Detected:</strong> Volumetric UDP Spike (4.2 Gbps) on Gateway Sensor 04</span>
+              {/* CHART 4: USER THREAT HISTORY & TREND PLOT (DYNAMIC TIME HORIZON) */}
+              <div className="anlt-chart-box" style={{ width: "100%", minWidth: "100%", boxSizing: "border-box" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1rem" }}>
+                  <h4 className="anlt-chart-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <TrendingUp size={16} style={{ color: "#38bdf8" }} />
+                    4. Historical Threat Trend Plot ({timeRange.toUpperCase()} Horizon)
+                  </h4>
+                  <span style={{ fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                    Interval Scale: <strong>{timeSeriesData.length} Days Plotted</strong>
+                  </span>
                 </div>
-                <div className="anlt-timeline-item">
-                  <span className="anlt-timeline-time">09:30 AM</span>
-                  <span className="anlt-timeline-text"><strong>Risk Score Updated:</strong> Composite SOC Risk Score updated from Low to Medium (48/100)</span>
-                </div>
-                <div className="anlt-timeline-item">
-                  <span className="anlt-timeline-time">09:15 AM</span>
-                  <span className="anlt-timeline-text"><strong>AI Model Inference:</strong> Neural weights auto-tuned with 99.4% precision accuracy</span>
-                </div>
-                <div className="anlt-timeline-item">
-                  <span className="anlt-timeline-time">08:50 AM</span>
-                  <span className="anlt-timeline-text"><strong>Traffic Spike:</strong> Ingress anomaly (+140% volume) flagged on Port 53 (DNS)</span>
-                </div>
-                <div className="anlt-timeline-item">
-                  <span className="anlt-timeline-time">08:10 AM</span>
-                  <span className="anlt-timeline-text"><strong>Security Recommendation:</strong> AI generated IP block rule for 185.220.101.0/24</span>
-                </div>
+                <ResponsiveContainer width="100%" minWidth="100%" height={280}>
+                  <AreaChart data={timeSeriesData}>
+                    <defs>
+                      <linearGradient id="historyGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.06)" : "#cbd5e1"} />
+                    <XAxis dataKey="label" stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} />
+                    <YAxis stroke={isDark ? "#94a3b8" : "#475569"} fontSize={11} tickLine={false} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: isDark ? "#0f172a" : "#ffffff",
+                        borderColor: isDark ? "#334155" : "#cbd5e1",
+                        borderRadius: "8px",
+                        color: isDark ? "#f8fafc" : "#1e293b",
+                      }}
+                      labelFormatter={(label, items) => {
+                        const item = items && items[0] && items[0].payload;
+                        return item ? `Date: ${item.date}` : label;
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: "11px", color: isDark ? "#94a3b8" : "#334155" }} />
+                    <Area type="monotone" dataKey="daily_total" name="Daily Threat Volume" stroke="#38bdf8" fillOpacity={1} fill="url(#historyGrad)" isAnimationActive={true} />
+                    <Area type="monotone" dataKey="critical" name="Critical Severities" stroke="#ef4444" fillOpacity={0} isAnimationActive={true} />
+                    <Area type="monotone" dataKey="high" name="High Severities" stroke="#f97316" fillOpacity={0} isAnimationActive={true} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </>

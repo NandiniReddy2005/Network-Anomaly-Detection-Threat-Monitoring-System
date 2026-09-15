@@ -80,9 +80,7 @@ export default function RegisterPage() {
       <div className="ns-auth-card">
         <div className="ns-auth-header">
           <Shield className="ns-auth-logo-icon" size={36} />
-          <h1 className="ns-auth-title">
-            NetShield-AI <span className="ns-auth-tag">REGISTER</span>
-          </h1>
+          <h1 className="ns-auth-title">NetShield-AI</h1>
           <p className="ns-auth-subtitle">Enterprise SOC Security Gateway</p>
         </div>
 

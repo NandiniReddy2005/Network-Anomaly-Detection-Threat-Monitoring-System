@@ -10,12 +10,12 @@ import {
   ChevronDown,
   ShieldCheck,
   Shield,
-  CheckCircle2,
   Key,
 } from "lucide-react";
 
 import { useTheme } from "../context/ThemeContext";
 import { clearCurrentUser } from "../utils/authHelpers";
+import NotificationDropdown from "./NotificationDropdown";
 
 export default function Navbar({
   currentUser,
@@ -125,12 +125,8 @@ export default function Navbar({
           )}
         </button>
 
-        <div className="topbar-icon-btn notification-badge">
-          <Bell size={18} />
-          <span className="badge-counter">
-            {notificationCount !== undefined ? notificationCount : 3}
-          </span>
-        </div>
+        {/* Dynamic Notification Center Dropdown */}
+        <NotificationDropdown currentUser={currentUser} />
 
         {/* Interactive Profile Dropdown Container */}
         <div
@@ -287,30 +283,6 @@ export default function Navbar({
                     {userRoleText}
                   </div>
                 </div>
-              </div>
-
-              {/* Active Session Status */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.4rem",
-                  padding: "0.4rem 0.5rem",
-                  borderRadius: "6px",
-                  backgroundColor: isDark
-                    ? "rgba(34, 197, 94, 0.08)"
-                    : "#f0fdf4",
-                  color: isDark ? "#4ade80" : "#16a34a",
-                  fontSize: "0.725rem",
-                  fontWeight: 500,
-                  marginBottom: "0.5rem",
-                  border: isDark
-                    ? "1px solid rgba(34, 197, 94, 0.2)"
-                    : "1px solid #bbf7d0",
-                }}
-              >
-                <CheckCircle2 size={13} />
-                <span>Session Active • MFA Enforced</span>
               </div>
 
               {/* Logout Button */}

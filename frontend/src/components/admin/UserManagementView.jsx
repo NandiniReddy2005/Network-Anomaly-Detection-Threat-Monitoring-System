@@ -27,12 +27,12 @@ import { useTheme } from "../../context/ThemeContext";
 const DEFAULT_USERS = [
   {
     id: 1,
-    email: "analyst@gmail.com",
-    role: "Security Analyst",
-    raw_role: "analyst",
-    access: "Read / Monitor / Triage",
+    email: "demo@gmail.com",
+    role: "Security Administrator",
+    raw_role: "admin",
+    access: "Full Global Control",
     status: "Active",
-    created_at: "2026-07-27 08:52:03",
+    created_at: "2026-07-27 08:50:00 UTC",
   },
   {
     id: 2,
@@ -41,70 +41,25 @@ const DEFAULT_USERS = [
     raw_role: "admin",
     access: "Full Global Control",
     status: "Active",
-    created_at: "2026-07-27 08:52:03",
+    created_at: "2026-07-27 08:52:08 UTC",
   },
   {
     id: 3,
+    email: "analyst@gmail.com",
+    role: "Security Analyst",
+    raw_role: "analyst",
+    access: "Read / Monitor / Triage",
+    status: "Active",
+    created_at: "2026-07-27 08:52:03 UTC",
+  },
+  {
+    id: 4,
     email: "newuser@gmail.com",
     role: "Security Analyst",
     raw_role: "analyst",
     access: "Read / Monitor / Triage",
     status: "Active",
-    created_at: "2026-07-27 08:52:13",
-  },
-  {
-    id: 4,
-    email: "admin_lead@netshield.io",
-    role: "Security Administrator",
-    raw_role: "admin",
-    access: "Full Global Control",
-    status: "Active",
-    created_at: "2026-07-28 10:15:00",
-  },
-  {
-    id: 5,
-    email: "sec_director@netshield.io",
-    role: "Security Administrator",
-    raw_role: "admin",
-    access: "Full Global Control",
-    status: "Active",
-    created_at: "2026-07-28 11:20:45",
-  },
-  {
-    id: 6,
-    email: "sys_admin2@netshield.io",
-    role: "Security Administrator",
-    raw_role: "admin",
-    access: "Full Global Control",
-    status: "Active",
-    created_at: "2026-07-28 14:05:12",
-  },
-  {
-    id: 7,
-    email: "tier2_analyst@netshield.io",
-    role: "Security Analyst",
-    raw_role: "analyst",
-    access: "Read / Monitor / Triage",
-    status: "Active",
-    created_at: "2026-07-29 09:00:00",
-  },
-  {
-    id: 8,
-    email: "soc_analyst1@netshield.io",
-    role: "Security Analyst",
-    raw_role: "analyst",
-    access: "Read / Monitor / Triage",
-    status: "Active",
-    created_at: "2026-07-29 09:15:30",
-  },
-  {
-    id: 9,
-    email: "soc_lead@netshield.io",
-    role: "Security Administrator",
-    raw_role: "admin",
-    access: "Full Global Control",
-    status: "Active",
-    created_at: "2026-07-29 10:00:00",
+    created_at: "2026-07-27 08:52:13 UTC",
   },
 ];
 
@@ -112,6 +67,7 @@ export default function UserManagementView() {
   const { isDark } = useTheme();
 
   const [usersList, setUsersList] = useState([]);
+  const [userMetrics, setUserMetrics] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [usersError, setUsersError] = useState(null);
   const [isUsingFallback, setIsUsingFallback] = useState(false);
@@ -121,7 +77,7 @@ export default function UserManagementView() {
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 5;
+  const [pageSize, setPageSize] = useState(10);
 
   // Notification Toast
   const [toast, setToast] = useState(null);
@@ -157,6 +113,9 @@ export default function UserManagementView() {
     setIsUsingFallback(false);
     try {
       const res = await fetchApi("/api/auth/users");
+      if (res.metrics) {
+        setUserMetrics(res.metrics);
+      }
       const rawData = res.data || res.users || (Array.isArray(res) ? res : []);
       if (Array.isArray(rawData) && rawData.length > 0) {
         setUsersList(rawData);
@@ -178,14 +137,20 @@ export default function UserManagementView() {
   }, [fetchUsers]);
 
   // Derived KPI metrics
-  const totalUsers = usersList.length;
-  const adminCount = usersList.filter(
-    (u) => u.role === "Security Administrator" || u.raw_role === "admin"
-  ).length;
-  const analystCount = usersList.filter(
-    (u) => u.role === "Security Analyst" || u.raw_role === "analyst"
-  ).length;
-  const activeCount = usersList.filter((u) => u.status === "Active" || !u.status).length;
+  const totalUsers = userMetrics?.total_users ?? usersList.length;
+  const adminCount =
+    userMetrics?.administrators_count ??
+    usersList.filter(
+      (u) => u.role === "Security Administrator" || u.raw_role === "admin"
+    ).length;
+  const analystCount =
+    userMetrics?.analysts_count ??
+    usersList.filter(
+      (u) => u.role === "Security Analyst" || u.raw_role === "analyst"
+    ).length;
+  const activeCount =
+    userMetrics?.active_sessions_count ??
+    usersList.filter((u) => u.status === "Active" || !u.status).length;
 
   // Filtered & Search Results
   const filteredUsers = useMemo(() => {
@@ -216,7 +181,7 @@ export default function UserManagementView() {
   // Reset pagination to page 1 when search query or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilter, statusFilter]);
+  }, [searchQuery, roleFilter, statusFilter, pageSize]);
 
   // Calculate total pages dynamically based on filtered users count
   const totalPages = useMemo(() => {
@@ -263,6 +228,7 @@ export default function UserManagementView() {
           email: newUserForm.email,
           password: newUserForm.password,
           role: newUserForm.role,
+          status: newUserForm.status || "Active",
         }),
       });
       showToast("success", `User account ${newUserForm.email} created successfully.`);
@@ -312,23 +278,26 @@ export default function UserManagementView() {
       if (selectedUser.id && !isUsingFallback) {
         await fetchApi(`/api/auth/users/${selectedUser.id}`, {
           method: "PUT",
-          body: JSON.stringify({ role: editUserForm.role }),
+          body: JSON.stringify({ role: editUserForm.role, status: editUserForm.status }),
         });
+        showToast("success", `Updated role & status for ${selectedUser.email}.`);
+        fetchUsers();
+      } else {
+        setUsersList((prev) =>
+          prev.map((u) =>
+            u.email === selectedUser.email
+              ? {
+                  ...u,
+                  role: newRoleTitle,
+                  raw_role: editUserForm.role,
+                  access: newAccess,
+                  status: editUserForm.status,
+                }
+              : u
+          )
+        );
+        showToast("success", `Updated role & permissions for ${selectedUser.email}.`);
       }
-      setUsersList((prev) =>
-        prev.map((u) =>
-          u.email === selectedUser.email
-            ? {
-                ...u,
-                role: newRoleTitle,
-                raw_role: editUserForm.role,
-                access: newAccess,
-                status: editUserForm.status,
-              }
-            : u
-        )
-      );
-      showToast("success", `Updated role & permissions for ${selectedUser.email}.`);
     } catch (err) {
       setUsersList((prev) =>
         prev.map((u) =>
@@ -365,9 +334,12 @@ export default function UserManagementView() {
         await fetchApi(`/api/auth/users/${selectedUser.id}`, {
           method: "DELETE",
         });
+        showToast("success", `Account ${selectedUser.email} has been removed.`);
+        fetchUsers();
+      } else {
+        setUsersList((prev) => prev.filter((u) => u.email !== selectedUser.email));
+        showToast("success", `Account ${selectedUser.email} has been removed.`);
       }
-      setUsersList((prev) => prev.filter((u) => u.email !== selectedUser.email));
-      showToast("success", `Account ${selectedUser.email} has been removed.`);
     } catch (err) {
       setUsersList((prev) => prev.filter((u) => u.email !== selectedUser.email));
       showToast("success", `Account ${selectedUser.email} removed.`);
@@ -734,6 +706,33 @@ export default function UserManagementView() {
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
           </select>
+
+          {/* Rows Per Page Selector */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <span style={{ fontSize: "0.8rem", color: isDark ? "#94a3b8" : "#64748b", fontWeight: 500 }}>
+              Rows:
+            </span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              title="Rows per page limit"
+              style={{
+                padding: "0.5rem 0.75rem",
+                borderRadius: "6px",
+                border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #cbd5e1",
+                backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+                color: isDark ? "#f8fafc" : "#0f172a",
+                fontSize: "0.825rem",
+                outline: "none",
+                cursor: "pointer",
+              }}
+            >
+              <option value={8}>8 per page</option>
+              <option value={10}>10 per page</option>
+              <option value={15}>15 per page</option>
+              <option value={20}>20 per page</option>
+            </select>
+          </div>
         </div>
 
         {/* Action Controls: Refresh & Add User */}
@@ -780,19 +779,30 @@ export default function UserManagementView() {
       </div>
 
       {/* Main Table */}
-      <div className="table-responsive">
+      <div
+        className="table-responsive"
+        style={{
+          width: "100%",
+          height: "auto",
+          maxHeight: "none",
+          overflowX: "auto",
+          overflowY: "visible",
+          borderRadius: "8px",
+          border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid #e2e8f0",
+        }}
+      >
         {loadingUsers ? (
           <LoadingSpinner text="Loading user directory from PostgreSQL database..." />
         ) : paginatedUsers.length > 0 ? (
-          <table className="ns-soc-table">
-            <thead>
+          <table className="ns-soc-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead style={{ position: "sticky", top: 0, zIndex: 5, backgroundColor: isDark ? "#0f172a" : "#f8fafc" }}>
               <tr>
-                <th>User / Account Email</th>
-                <th>Assigned Role</th>
-                <th>Access Privilege Level</th>
-                <th>Status</th>
-                <th>Provisioned / Created</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
+                <th style={{ padding: "0.6rem 0.85rem" }}>User / Account Email</th>
+                <th style={{ padding: "0.6rem 0.85rem" }}>Assigned Role</th>
+                <th style={{ padding: "0.6rem 0.85rem" }}>Access Privilege Level</th>
+                <th style={{ padding: "0.6rem 0.85rem" }}>Status</th>
+                <th style={{ padding: "0.6rem 0.85rem" }}>Provisioned / Created</th>
+                <th style={{ textAlign: "right", padding: "0.6rem 0.85rem" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -803,7 +813,7 @@ export default function UserManagementView() {
 
                 return (
                   <tr key={userKey}>
-                    <td>
+                    <td style={{ padding: "0.55rem 0.85rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <div
                           style={{
@@ -831,7 +841,7 @@ export default function UserManagementView() {
                       </div>
                     </td>
 
-                    <td>
+                    <td style={{ padding: "0.55rem 0.85rem" }}>
                       <span
                         style={{
                           display: "inline-flex",
@@ -865,11 +875,11 @@ export default function UserManagementView() {
                       </span>
                     </td>
 
-                    <td style={{ fontSize: "0.825rem", color: isDark ? "#cbd5e1" : "#475569" }}>
+                    <td style={{ padding: "0.55rem 0.85rem", fontSize: "0.825rem", color: isDark ? "#cbd5e1" : "#475569" }}>
                       {u.access || (isAdmin ? "Full Global Control" : "Read / Monitor / Triage")}
                     </td>
 
-                    <td>
+                    <td style={{ padding: "0.55rem 0.85rem" }}>
                       <span
                         className={`status-badge ${
                           (u.status || "Active").toLowerCase() === "active" ? "normal" : "warning"
@@ -879,11 +889,17 @@ export default function UserManagementView() {
                       </span>
                     </td>
 
-                    <td style={{ fontSize: "0.8rem", color: isDark ? "#94a3b8" : "#64748b" }}>
-                      {u.created_at || "System Default"}
+                    <td style={{ padding: "0.55rem 0.85rem", fontSize: "0.8rem", color: isDark ? "#94a3b8" : "#64748b" }}>
+                      <code>
+                        {u.created_at
+                          ? u.created_at.includes("UTC")
+                            ? u.created_at
+                            : `${u.created_at} UTC`
+                          : "2026-07-27 08:52:03 UTC"}
+                      </code>
                     </td>
 
-                    <td>
+                    <td style={{ padding: "0.55rem 0.85rem" }}>
                       <div
                         style={{
                           display: "flex",

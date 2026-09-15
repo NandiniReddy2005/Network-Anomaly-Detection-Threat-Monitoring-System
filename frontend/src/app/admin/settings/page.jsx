@@ -1,9 +1,5 @@
-import AdminSettingsView from "../../../components/admin/AdminSettingsView";
-
-export const metadata = {
-  title: "Settings | Security Administrator | NetShield-AI",
-};
+import { redirect } from "next/navigation";
 
 export default function SettingsPage() {
-  return <AdminSettingsView />;
+  redirect("/admin/dashboard");
 }

@@ -1,9 +1,5 @@
-import SettingsView from "../../../components/analyst/SettingsView";
-
-export const metadata = {
-  title: "Settings | Security Analyst | NetShield-AI",
-};
+import { redirect } from "next/navigation";
 
 export default function SettingsPage() {
-  return <SettingsView />;
+  redirect("/analyst/dashboard");
 }

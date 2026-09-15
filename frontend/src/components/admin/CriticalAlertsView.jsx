@@ -14,6 +14,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  ShieldAlert,
 } from "lucide-react";
 import {
   ComposedChart,
@@ -30,7 +31,7 @@ import {
 
 import LoadingSpinner from "../LoadingSpinner";
 import { getFormattedUTCTime } from "../../utils/formatDate";
-import { fetchApi } from "../../utils/api";
+import { fetchApi, getMlReport, analyzeCriticalAlert, getCriticalAlerts, executeCriticalAlertAction } from "../../utils/api";
 import { API_BASE_URL } from "../../utils/constants";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -91,11 +92,17 @@ export default function CriticalAlertsView() {
   const { isDark } = useTheme();
   const [currentTime, setCurrentTime] = useState("");
   const [alertActionMsg, setAlertActionMsg] = useState(null);
-
-  const [incidents, setIncidents] = useState([]);
-  const [criticalAlerts, setCriticalAlerts] = useState([]);
-  const [loadingCriticalAlerts, setLoadingCriticalAlerts] = useState(true);
+  
+  const [alertsList, setAlertsList] = useState([]);
+  const [loadingCriticalAlerts, setLoadingCriticalAlerts] = useState(false);
   const [criticalAlertsError, setCriticalAlertsError] = useState(null);
+
+  const [alertDatasetFilter, setAlertDatasetFilter] = useState("UNSW-NB15");
+  const [sourceIp, setSourceIp] = useState("185.220.101.5");
+  const [destinationIp, setDestinationIp] = useState("10.0.0.2 (Auth Server)");
+  const [sourcePort, setSourcePort] = useState("54321");
+  const [destinationPort, setDestinationPort] = useState("443");
+  const [protocol, setProtocol] = useState("TCP");
 
   const [alertSearchQuery, setAlertSearchQuery] = useState("");
   const [alertSeverityFilter, setAlertSeverityFilter] = useState("All");
@@ -105,161 +112,233 @@ export default function CriticalAlertsView() {
   const [alertPage, setAlertPage] = useState(1);
   const [activeAlertId, setActiveAlertId] = useState(null);
 
-  const [threatChartData, setThreatChartData] = useState([]);
+  const [alertChartData, setAlertChartData] = useState([]);
 
-  useEffect(() => {
-    setCurrentTime(getFormattedUTCTime());
-    const timer = setInterval(() => setCurrentTime(getFormattedUTCTime()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // Interactive ML Risk Analysis State
+  const [analyzingAlert, setAnalyzingAlert] = useState(false);
+  const [alertAnalysisResult, setAlertAnalysisResult] = useState(null);
+  const [alertAnalysisError, setAlertAnalysisError] = useState(null);
 
-  const fetchIncidents = useCallback(async () => {
-    try {
-      const res = await fetchApi("/api/incidents");
-      setIncidents(res.data || res.incidents || (Array.isArray(res) ? res : []));
-    } catch (err) {}
-  }, []);
-
-  const fetchCriticalAlerts = useCallback(async () => {
+  const loadCriticalAlerts = useCallback(async () => {
     setLoadingCriticalAlerts(true);
     setCriticalAlertsError(null);
     try {
-      const res = await fetchApi("/api/dashboard/critical-alerts");
-      setCriticalAlerts(res.data || res.alerts || (Array.isArray(res) ? res : []));
+      let email = "";
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("netshield_current_user") || localStorage.getItem("user");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            email = parsed?.email || "";
+          } catch (e) {}
+        }
+      }
+      const res = await getCriticalAlerts(email);
+      const items = res.alerts || res.data || [];
+      if (Array.isArray(items) && items.length > 0) {
+        setAlertsList(items);
+        const chartPoints = items.slice(0, 12).reverse().map((item, idx) => ({
+          time: item.timestamp || `T+${idx * 5}m`,
+          score: parseFloat(item.risk_score_val || item.threat_score) || 85.0,
+          value: parseFloat(item.risk_score_val || item.threat_score) || 85.0
+        }));
+        setAlertChartData(chartPoints);
+      }
     } catch (err) {
-      setCriticalAlertsError("Failed to fetch critical alerts.");
+      console.error("Failed to load critical alerts from PostgreSQL:", err);
+      setCriticalAlertsError("Could not retrieve critical alert records from PostgreSQL database.");
     } finally {
       setLoadingCriticalAlerts(false);
     }
   }, []);
 
-  const fetchThreatChart = useCallback(async () => {
+  const handleAnalyzeCriticalAlert = async () => {
+    setAnalyzingAlert(true);
+    setAlertAnalysisError(null);
     try {
-      const res = await fetchApi("/api/dashboard/threat-chart");
-      setThreatChartData(res.data || res.chart_data || (Array.isArray(res) ? res : []));
-    } catch (err) {}
-  }, []);
+      const payload = {
+        dataset: alertDatasetFilter,
+        source_ip: sourceIp,
+        destination_ip: destinationIp,
+        source_port: sourcePort,
+        destination_port: destinationPort,
+        protocol: protocol,
+      };
+
+      const res = await analyzeCriticalAlert(payload);
+      const alertData = res.data || res;
+
+      if (alertData) {
+        setAlertAnalysisResult(alertData);
+        setActiveAlertId(alertData.id || alertData.alert_id);
+
+        const newAlertObj = {
+          id: alertData.id || alertData.alert_id || `ALT-${Math.floor(100 + Math.random() * 900)}`,
+          title: alertData.title || `${alertData.attack_type || "Cyber Threat Anomaly"} against ${destinationIp}`,
+          severity: alertData.severity || "Critical",
+          source_ip: alertData.source_ip || sourceIp,
+          destination_ip: alertData.destination_ip || destinationIp,
+          asset: alertData.asset || `Asset ${destinationIp}`,
+          timestamp: alertData.timestamp || "Just now",
+          analyst: "SOC Emergency Escalation Team",
+          status: alertData.status || "Investigating",
+          priority: alertData.priority || "P1 - Emergency",
+          action: alertData.containment_playbook || alertData.action || "Isolate Source & Execute Containment Playbook",
+          description: alertData.description || `Critical security incident detected from ${sourceIp} targeting ${destinationIp}.`,
+          attack_type: alertData.attack_type || alertData.type || "Cyber Threat Anomaly",
+          engine: alertData.engine || `AI-Neural-Probe (${alertDatasetFilter})`,
+          confidence: alertData.confidence || alertData.confidence_score || "98.5%",
+          risk_score: alertData.composite_risk_score || alertData.risk_score || "85 / 100",
+          affected_systems: `Asset Node ${destinationIp}`,
+          mitre: alertData.mitre_tag || alertData.mitre || "T1498 - Network Denial of Service",
+        };
+
+        setAlertsList((prev) => [newAlertObj, ...prev.filter((a) => String(a.id) !== String(newAlertObj.id))]);
+
+        const scoreVal = alertData.risk_score_val !== undefined ? alertData.risk_score_val : (parseFloat(alertData.threat_score) || 85.0);
+        setAlertChartData((prev) => {
+          const next = [...prev, { time: newAlertObj.timestamp || `T+${prev.length * 5}m`, score: scoreVal, value: scoreVal }];
+          return next.slice(-12);
+        });
+
+        loadCriticalAlerts();
+      }
+    } catch (err) {
+      console.error("Alert analysis error:", err);
+      setAlertAnalysisError("Failed to execute FastAPI ML incident risk analysis.");
+    } finally {
+      setAnalyzingAlert(false);
+    }
+  };
+
+  const handleExecuteContainment = async (alertId) => {
+    if (!alertId) return;
+    try {
+      await executeCriticalAlertAction(alertId, "EXECUTE_CONTAINMENT", "Enforced automated containment playbook via SOC panel.");
+      setAlertActionMsg(`Enforced mitigation playbook on ${alertId}!`);
+      setTimeout(() => setAlertActionMsg(null), 3000);
+      loadCriticalAlerts();
+    } catch (err) {
+      console.error("Error executing containment:", err);
+      setAlertActionMsg(`Failed to execute containment playbook on ${alertId}.`);
+    }
+  };
+
+  const handleResolveAlert = async (alertId) => {
+    if (!alertId) return;
+    try {
+      await executeCriticalAlertAction(alertId, "RESOLVE_ALERT", "Marked critical alert as resolved by analyst.");
+      setAlertActionMsg(`Marked alert ${alertId} as Resolved!`);
+      setTimeout(() => setAlertActionMsg(null), 3000);
+      loadCriticalAlerts();
+    } catch (err) {
+      console.error("Error resolving alert:", err);
+      setAlertActionMsg(`Failed to resolve alert ${alertId}.`);
+    }
+  };
 
   useEffect(() => {
-    fetchIncidents();
-    fetchCriticalAlerts();
-    fetchThreatChart();
-  }, [fetchIncidents, fetchCriticalAlerts, fetchThreatChart]);
+    setCurrentTime(getFormattedUTCTime());
+    loadCriticalAlerts();
+    const timer = setInterval(() => setCurrentTime(getFormattedUTCTime()), 1000);
+    return () => clearInterval(timer);
+  }, [loadCriticalAlerts]);
 
-  const handleExportSystemLogs = () => {
-    window.open(`${API_BASE_URL}/api/reports/json`, "_blank");
+  const handleExportSystemLogs = (targetAlert = currentActiveAlert) => {
+    const activeAlert = targetAlert || currentActiveAlert;
+    if (!activeAlert) {
+      setAlertActionMsg("No active critical alert selected for forensic log export.");
+      setTimeout(() => setAlertActionMsg(null), 3000);
+      return;
+    }
+
+    const alertIdStr = activeAlert.id || activeAlert.alert_id || "ALT-972";
+    const cleanAlertId = String(alertIdStr).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const timestampUtc = getFormattedUTCTime();
+    const exportFileName = `netshield_critical_alert_${cleanAlertId}_forensic_log_${timestampUtc.replace(/[: ]/g, "_")}.json`;
+
+    const comprehensivePayload = {
+      status: "success",
+      report_type: "NetShield-AI Critical Security Alert Forensic Log Export",
+      export_timestamp_utc: timestampUtc,
+      security_classification: "CISO CONFIDENTIAL / SOC DEEP FORENSIC AUDIT",
+      generated_by_analyst: activeAlert.analyst || "SOC Emergency Escalation Team",
+      database_source: "PostgreSQL Engine (critical_alerts & critical_alert_actions tables)",
+      selected_alert_id: alertIdStr,
+      summary_metrics: {
+        total_critical_alerts: 1,
+        active_emergencies_count: (activeAlert.priority || "").includes("P1") || (activeAlert.severity || "").toLowerCase() === "critical" ? 1 : 0,
+        mitigated_alerts_count: (activeAlert.status || "").toLowerCase() === "mitigated" || (activeAlert.status || "").toLowerCase() === "resolved" ? 1 : 0,
+      },
+      critical_security_alerts: [
+        {
+          alert_id: alertIdStr,
+          timestamp: activeAlert.timestamp || timestampUtc,
+          title: activeAlert.title || `Cyber Threat Anomaly against ${activeAlert.destination_ip}`,
+          attack_type: activeAlert.attack_type || activeAlert.type || "Network Anomaly Intercepted",
+          severity: (activeAlert.severity || "CRITICAL").toUpperCase(),
+          priority: activeAlert.priority || "P1 - Emergency",
+          status: activeAlert.status || "Investigating",
+          telemetry: {
+            source_ip: activeAlert.source_ip || "185.220.101.5",
+            destination_ip: activeAlert.destination_ip || "10.0.0.2 (Auth Server)",
+            asset: activeAlert.asset || `Asset ${activeAlert.destination_ip}`,
+            source_port: activeAlert.source_port || 54321,
+            destination_port: activeAlert.destination_port || 443,
+            protocol: activeAlert.protocol || "TCP",
+            dataset_engine: activeAlert.dataset || activeAlert.engine || "UNSW-NB15",
+            affected_systems: activeAlert.affected_systems || `Asset Node ${activeAlert.destination_ip}`
+          },
+          risk_assessment: {
+            composite_risk_score: activeAlert.risk_score || "85 / 100",
+            numeric_risk_value: activeAlert.risk_score_val !== undefined ? activeAlert.risk_score_val : (parseFloat(activeAlert.threat_score) || 85.0),
+            confidence_score: activeAlert.confidence || "98.5%",
+            detection_engine: activeAlert.engine || "AI-Neural-Probe (UNSW-NB15)"
+          },
+          mitre_attack_framework: {
+            mitre_tag: activeAlert.mitre || activeAlert.mitre_tag || "T1498 - Network Denial of Service",
+            tactic: "Impact / Network Service Disruption"
+          },
+          containment_playbook: {
+            action_recommended: activeAlert.action || activeAlert.containment_playbook || "Isolate Source & Execute Containment Playbook",
+            assigned_analyst: activeAlert.analyst || "SOC Emergency Escalation Team",
+            description: activeAlert.description || "Critical security incident detected from source IP."
+          }
+        }
+      ]
+    };
+
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(comprehensivePayload, null, 2));
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", exportFileName);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setAlertActionMsg(`Exported forensic log telemetry for active alert ${alertIdStr} to ${exportFileName}`);
+      setTimeout(() => setAlertActionMsg(null), 4000);
+    } catch (e) {
+      console.error("Client side export fallback:", e);
+      window.open(`${API_BASE_URL}/api/reports/json?alert_id=${encodeURIComponent(alertIdStr)}`, "_blank");
+    }
   };
 
   const formattedThreatChart = useMemo(() => {
-    if (threatChartData && threatChartData.length > 0) {
-      return threatChartData.map((item, idx) => {
-        const val = item.value !== undefined ? item.value : (parseInt(item.height) || 50);
-        return {
-          time: item.time || item.timestamp || `T+${idx * 5}m`,
-          volume: Math.round(val * 1.1 + 20),
-          score: val,
-        };
-      });
-    }
-    return [
-      { time: "00:00", volume: 45, score: 50 },
-      { time: "04:00", volume: 30, score: 35 },
-      { time: "08:00", volume: 85, score: 80 },
-      { time: "12:00", volume: 92, score: 95 },
-      { time: "16:00", volume: 78, score: 70 },
-      { time: "20:00", volume: 65, score: 60 },
-      { time: "24:00", volume: 48, score: 45 },
-    ];
-  }, [threatChartData]);
+    if (!alertChartData || alertChartData.length === 0) return [];
+    return alertChartData.map((item, idx) => {
+      const val = item.score !== undefined ? item.score : (item.value !== undefined ? item.value : (parseInt(item.height) || 50));
+      return {
+        time: item.time || item.timestamp || `T+${idx * 5}m`,
+        volume: Math.round(val * 1.1 + 20),
+        score: val,
+      };
+    });
+  }, [alertChartData]);
 
   const combinedCriticalAlertsList = useMemo(() => {
-    const raw = criticalAlerts.length > 0 ? criticalAlerts : incidents;
-    if (!raw || raw.length === 0) {
-      return [
-        {
-          id: "ALT-301",
-          title: "Brute Force SSH Attack Against Core Auth Gateway",
-          severity: "Critical",
-          source_ip: "185.220.101.5",
-          destination_ip: "10.0.0.2 (Auth Server)",
-          asset: "Authentication Gateway Node 01",
-          timestamp: "3 mins ago",
-          analyst: "Security Admin Team",
-          status: "Investigating",
-          priority: "P1 - Emergency",
-          action: "Block Source Subnet & Enable Fail2Ban Policy",
-          description: "Multiple failed authentication attempts (over 100 req/sec) originating from blacklisted TOR exit node.",
-          attack_type: "Credential Spraying & Brute Force",
-          engine: "AI-Neural-Inference-Probe",
-          confidence: "99.4%",
-          risk_score: "94 / 100",
-          affected_systems: "Auth Service, User Roster DB",
-          mitre: "T1110 - Brute Force",
-        },
-        {
-          id: "ALT-302",
-          title: "Exfiltration Anomaly Detected on Subnet Gateway",
-          severity: "High",
-          source_ip: "10.0.0.45 (Internal)",
-          destination_ip: "194.26.29.90 (External)",
-          asset: "Subnet Switch eth0",
-          timestamp: "14 mins ago",
-          analyst: "L2 SOC Specialist",
-          status: "Open",
-          priority: "P2 - High",
-          action: "Isolate Internal Host IP & Terminate Connection",
-          description: "Unusual outbound data transfer surge (2.4 GB in 60s) flagged by netflow monitoring sensor.",
-          attack_type: "Data Exfiltration Anomaly",
-          engine: "Suricata-IDS-v5",
-          confidence: "96.8%",
-          risk_score: "88 / 100",
-          affected_systems: "Internal Workstation 45",
-          mitre: "T1041 - Exfiltration Over C2 Channel",
-        },
-        {
-          id: "ALT-303",
-          title: "FastAPI Rate Limit Threshold Breach on Telemetry Endpoint",
-          severity: "Medium",
-          source_ip: "45.154.255.12",
-          destination_ip: "10.0.0.1 (API Gateway)",
-          asset: "FastAPI Cluster Node",
-          timestamp: "25 mins ago",
-          analyst: "System Auto-Mitigation",
-          status: "Resolved",
-          priority: "P3 - Standard",
-          action: "Enforce IP Throttling",
-          description: "Burst request rate exceeded 500 req/sec limit from single source IP.",
-          attack_type: "API Abuse & Scraping",
-          engine: "FastAPI-Shield-Middleware",
-          confidence: "99.0%",
-          risk_score: "65 / 100",
-          affected_systems: "REST API Cluster",
-          mitre: "T1499 - Endpoint Denial of Service",
-        },
-        {
-          id: "ALT-304",
-          title: "Ransomware File Canary Traps Triggered in Storage",
-          severity: "Critical",
-          source_ip: "10.0.0.88 (Internal)",
-          destination_ip: "10.0.0.20 (NAS)",
-          asset: "Enterprise NAS Storage Buffer",
-          timestamp: "45 mins ago",
-          analyst: "SOC Emergency Team",
-          status: "Escalated",
-          priority: "P1 - Emergency",
-          action: "Isolate Host Endpoint & Cut SMB Share",
-          description: "Encrypted canary files detected in honeypot directory on file server.",
-          attack_type: "Ransomware Encryption Activity",
-          engine: "Storage-Honeypot-Agent",
-          confidence: "99.8%",
-          risk_score: "99 / 100",
-          affected_systems: "NAS Volume 02, Workstation-88",
-          mitre: "T1486 - Data Encrypted for Impact",
-        },
-      ];
-    }
-
-    return raw.map((item, idx) => ({
+    if (!alertsList || alertsList.length === 0) return [];
+    return alertsList.map((item, idx) => ({
       id: item.id ? (String(item.id).startsWith("ALT") ? item.id : `ALT-${item.id}`) : `ALT-30${idx + 1}`,
       title: item.title || item.type || "Critical Security Event Triggered",
       severity: item.severity || "Critical",
@@ -270,16 +349,16 @@ export default function CriticalAlertsView() {
       analyst: item.analyst || "SOC Emergency Escalation Team",
       status: item.status || "Investigating",
       priority: item.priority || (item.severity === "Critical" ? "P1 - Emergency" : "P2 - High"),
-      action: item.action || "Isolate Source & Execute Containment Playbook",
+      action: item.action || item.containment_playbook || "Isolate Source & Execute Containment Playbook",
       description: item.description || item.details || "Security event flagged by enterprise anomaly probe requiring administrative triage.",
       attack_type: item.attack_type || item.type || "Cyber Threat Anomaly",
       engine: item.engine || "AI-Neural-Inference-Probe",
       confidence: item.confidence || `${94 + (idx % 5)}.%`,
       risk_score: item.risk_score || `${85 + (idx % 12)} / 100`,
       affected_systems: item.affected_systems || "Core Gateway, API Services",
-      mitre: item.mitre || "T1078 - Valid Accounts / T1498 - Network Denial of Service",
+      mitre: item.mitre || item.mitre_tag || "T1078 - Valid Accounts / T1498 - Network Denial of Service",
     }));
-  }, [criticalAlerts, incidents]);
+  }, [alertsList]);
 
   const filteredAndSortedAlerts = useMemo(() => {
     let list = [...combinedCriticalAlertsList];
@@ -349,19 +428,20 @@ export default function CriticalAlertsView() {
   }, [combinedCriticalAlertsList, activeAlertId]);
 
   const alertSeverityDistributionData = useMemo(() => {
-    let crit = 0, high = 0, med = 0, low = 0;
+    let p1 = 0, p2 = 0, p3 = 0, p4 = 0;
     combinedCriticalAlertsList.forEach((a) => {
-      const s = a.severity.toLowerCase();
-      if (s === "critical") crit++;
-      else if (s === "high") high++;
-      else if (s === "medium") med++;
-      else low++;
+      const prio = (a.priority || "").toLowerCase();
+      const sev = (a.severity || "").toLowerCase();
+      if (prio.includes("p1") || prio.includes("emergency") || sev === "critical") p1++;
+      else if (prio.includes("p2") || prio.includes("high") || sev === "high") p2++;
+      else if (prio.includes("p3") || prio.includes("medium") || sev === "medium") p3++;
+      else p4++;
     });
     return [
-      { name: "P1 Emergency", count: crit || 2, fill: "#ef4444" },
-      { name: "P2 High Risk", count: high || 3, fill: "#f97316" },
-      { name: "P3 Medium", count: med || 3, fill: "#f59e0b" },
-      { name: "P4 Info", count: low || 1, fill: "#3b82f6" },
+      { name: "P1 Emergency", count: p1, fill: "#ef4444" },
+      { name: "P2 High Risk", count: p2, fill: "#f97316" },
+      { name: "P3 Medium", count: p3, fill: "#f59e0b" },
+      { name: "P4 Info", count: p4, fill: "#3b82f6" },
     ];
   }, [combinedCriticalAlertsList]);
 
@@ -414,10 +494,8 @@ export default function CriticalAlertsView() {
           </div>
           <button
             onClick={() => {
-              fetchCriticalAlerts();
-              fetchIncidents();
-              fetchThreatChart();
-              setAlertActionMsg("Refreshed critical security alert stream!");
+              loadCriticalAlerts();
+              setAlertActionMsg("Refreshed critical security alert telemetry feed from PostgreSQL!");
               setTimeout(() => setAlertActionMsg(null), 3000);
             }}
             className="soc-dash-btn-refresh"
@@ -428,7 +506,174 @@ export default function CriticalAlertsView() {
         </div>
       </div>
 
-      {/* 2. 6 KPI Summary Cards */}
+      {/* Interactive Administrator ML Incident / Risk Analyzer Box */}
+      <div
+        style={{
+          marginBottom: "1.5rem",
+          padding: "1.25rem",
+          borderRadius: "10px",
+          backgroundColor: isDark ? "rgba(15, 23, 42, 0.7)" : "#ffffff",
+          border: `1px solid ${isDark ? "rgba(239, 68, 68, 0.3)" : "#cbd5e1"}`,
+          boxShadow: isDark ? "0 4px 20px rgba(0, 0, 0, 0.4)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.85rem" }}>
+          <AlertTriangle size={18} style={{ color: "#EF4444" }} />
+          <h4 style={{ margin: 0, fontSize: "0.95rem", color: isDark ? "#f8fafc" : "#0f172a" }}>
+            Administrator Interactive Incident Risk Analyzer
+          </h4>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0.75rem", marginBottom: "0.85rem" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#475569", marginBottom: "0.25rem", fontWeight: 600 }}>
+              Target Dataset
+            </label>
+            <select
+              value={alertDatasetFilter}
+              onChange={(e) => {
+                setAlertDatasetFilter(e.target.value);
+                setAlertPage(1);
+              }}
+              className="ns-control"
+              style={{ width: "100%", padding: "0.4rem 0.65rem", fontSize: "0.8rem" }}
+            >
+              <option value="UNSW-NB15">UNSW-NB15</option>
+              <option value="CICIDS2017">CICIDS2017</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#475569", marginBottom: "0.25rem", fontWeight: 600 }}>
+              Source IP Origin
+            </label>
+            <input
+              type="text"
+              value={sourceIp}
+              onChange={(e) => setSourceIp(e.target.value)}
+              placeholder="e.g. 185.220.101.5"
+              className="ns-control"
+              style={{ width: "100%", padding: "0.4rem 0.65rem", fontSize: "0.8rem" }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#475569", marginBottom: "0.25rem", fontWeight: 600 }}>
+              Target Destination / Asset
+            </label>
+            <input
+              type="text"
+              value={destinationIp}
+              onChange={(e) => setDestinationIp(e.target.value)}
+              placeholder="e.g. 10.0.0.2 (Auth Server)"
+              className="ns-control"
+              style={{ width: "100%", padding: "0.4rem 0.65rem", fontSize: "0.8rem" }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#475569", marginBottom: "0.25rem", fontWeight: 600 }}>
+              Source Port
+            </label>
+            <input
+              type="text"
+              value={sourcePort}
+              onChange={(e) => setSourcePort(e.target.value)}
+              placeholder="e.g. 54321"
+              className="ns-control"
+              style={{ width: "100%", padding: "0.4rem 0.65rem", fontSize: "0.8rem" }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#475569", marginBottom: "0.25rem", fontWeight: 600 }}>
+              Destination Port
+            </label>
+            <input
+              type="text"
+              value={destinationPort}
+              onChange={(e) => setDestinationPort(e.target.value)}
+              placeholder="e.g. 443"
+              className="ns-control"
+              style={{ width: "100%", padding: "0.4rem 0.65rem", fontSize: "0.8rem" }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: "0.75rem", color: isDark ? "#94a3b8" : "#475569", marginBottom: "0.25rem", fontWeight: 600 }}>
+              Protocol
+            </label>
+            <select
+              value={protocol}
+              onChange={(e) => setProtocol(e.target.value)}
+              className="ns-control"
+              style={{ width: "100%", padding: "0.4rem 0.65rem", fontSize: "0.8rem" }}
+            >
+              <option value="TCP">TCP</option>
+              <option value="UDP">UDP</option>
+              <option value="ICMP">ICMP</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            onClick={handleAnalyzeCriticalAlert}
+            disabled={analyzingAlert}
+            className="ns-btn-gradient primary small"
+            style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+          >
+            <Zap size={14} />
+            {analyzingAlert ? "Evaluating Risk..." : "Analyze Incident Risk"}
+          </button>
+        </div>
+
+        {alertAnalysisError && (
+          <div style={{ color: "#ef4444", fontSize: "0.85rem", marginTop: "0.5rem" }}>{alertAnalysisError}</div>
+        )}
+
+        {alertAnalysisResult && (
+          <div
+            style={{
+              marginTop: "0.85rem",
+              padding: "1rem",
+              borderRadius: "8px",
+              background: isDark ? "rgba(30, 41, 59, 0.8)" : "#f8fafc",
+              border: `1px solid ${isDark ? "rgba(239, 68, 68, 0.3)" : "#e2e8f0"}`,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: "0.85rem",
+            }}
+          >
+            <div>
+              <span style={{ fontSize: "0.725rem", color: isDark ? "#94a3b8" : "#64748b" }}>Alert ID</span>
+              <div style={{ fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a", fontSize: "0.95rem", fontFamily: "monospace" }}>{alertAnalysisResult.alert_id || alertAnalysisResult.id}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: "0.725rem", color: isDark ? "#94a3b8" : "#64748b" }}>Attack Type</span>
+              <div style={{ fontWeight: 700, color: "#3B82F6", fontSize: "0.95rem" }}>{alertAnalysisResult.attack_type || alertAnalysisResult.type}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: "0.725rem", color: isDark ? "#94a3b8" : "#64748b" }}>Composite Risk Score</span>
+              <div style={{ fontWeight: 700, color: "#ef4444", fontSize: "0.95rem" }}>{alertAnalysisResult.composite_risk_score || alertAnalysisResult.risk_score}</div>
+            </div>
+            <div>
+              <span style={{ fontSize: "0.725rem", color: isDark ? "#94a3b8" : "#64748b" }}>Severity / Priority</span>
+              <div style={{ fontWeight: 700, color: alertAnalysisResult.severity === "Critical" ? "#ef4444" : "#f97316", fontSize: "0.95rem" }}>
+                {alertAnalysisResult.severity} ({alertAnalysisResult.priority})
+              </div>
+            </div>
+            <div>
+              <span style={{ fontSize: "0.725rem", color: isDark ? "#94a3b8" : "#64748b" }}>MITRE ATT&amp;CK Tag</span>
+              <div style={{ fontWeight: 700, color: "#a855f7", fontSize: "0.85rem" }}>
+                {alertAnalysisResult.mitre_tag || alertAnalysisResult.mitre}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2. KPI Summary Cards */}
       <div className="soc-dash-kpi-grid">
         <div className="soc-dash-kpi-card">
           <div className="soc-dash-kpi-top">
@@ -454,7 +699,7 @@ export default function CriticalAlertsView() {
             </div>
           </div>
           <div className="soc-dash-kpi-metric">
-            {combinedCriticalAlertsList.filter((a) => a.severity === "Critical").length || 2}
+            {combinedCriticalAlertsList.filter((a) => a.severity === "Critical").length}
           </div>
           <div className="soc-dash-kpi-bottom">
             <span className="soc-dash-trend-tag warning">Immediate Action</span>
@@ -470,7 +715,7 @@ export default function CriticalAlertsView() {
             </div>
           </div>
           <div className="soc-dash-kpi-metric">
-            {combinedCriticalAlertsList.filter((a) => a.severity === "High").length || 3}
+            {combinedCriticalAlertsList.filter((a) => a.severity === "High").length}
           </div>
           <div className="soc-dash-kpi-bottom">
             <span className="soc-dash-trend-tag warning">Elevated Risk</span>
@@ -486,7 +731,7 @@ export default function CriticalAlertsView() {
             </div>
           </div>
           <div className="soc-dash-kpi-metric">
-            {combinedCriticalAlertsList.filter((a) => a.status === "Investigating" || a.status === "Open").length || 4}
+            {combinedCriticalAlertsList.filter((a) => a.status === "Investigating" || a.status === "Open").length}
           </div>
           <div className="soc-dash-kpi-bottom">
             <span className="soc-dash-trend-tag stable">Active Triage</span>
@@ -502,7 +747,7 @@ export default function CriticalAlertsView() {
             </div>
           </div>
           <div className="soc-dash-kpi-metric">
-            {combinedCriticalAlertsList.filter((a) => a.status === "Mitigated" || a.status === "Resolved").length || 3}
+            {combinedCriticalAlertsList.filter((a) => a.status === "Mitigated" || a.status === "Resolved").length}
           </div>
           <div className="soc-dash-kpi-bottom">
             <span className="soc-dash-trend-tag up">
@@ -567,21 +812,29 @@ export default function CriticalAlertsView() {
             <span className="soc-dash-badge">Real-Time Ingestion</span>
           </div>
           <div style={{ width: "100%", height: 230 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={formattedThreatChart} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"} />
-                <XAxis dataKey="time" stroke={isDark ? "#64748b" : "#475569"} fontSize={11} tickLine={false} />
-                <YAxis yAxisId="left" stroke={isDark ? "#64748b" : "#475569"} fontSize={11} tickLine={false} />
-                <Tooltip content={<CustomAdminTooltip />} />
-                <Line yAxisId="left" type="monotone" dataKey="score" name="Incident Velocity" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 3, fill: "#ef4444" }} activeDot={{ r: 6 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            {formattedThreatChart && formattedThreatChart.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={formattedThreatChart} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"} />
+                  <XAxis dataKey="time" stroke={isDark ? "#64748b" : "#475569"} fontSize={11} tickLine={false} />
+                  <YAxis yAxisId="left" stroke={isDark ? "#64748b" : "#475569"} fontSize={11} tickLine={false} />
+                  <Tooltip content={<CustomAdminTooltip />} />
+                  <Line yAxisId="left" type="monotone" dataKey="score" name="Incident Velocity" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 3, fill: "#ef4444" }} activeDot={{ r: 6 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: isDark ? "#64748b" : "#94a3b8" }}>
+                <Clock size={28} style={{ marginBottom: "0.5rem", opacity: 0.5 }} />
+                <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>No alert rate timeline data points recorded yet.</span>
+                <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>Submit an incident risk analysis above to plot scores.</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* 5. Detailed Alert Inspection Panel */}
-      {currentActiveAlert && (
+      {currentActiveAlert ? (
         <div className="soc-threat-details-box red-accent">
           <div className="soc-dash-card-header" style={{ border: "none", padding: 0 }}>
             <h3 className="soc-dash-card-title" style={{ fontSize: "1rem" }}>
@@ -611,7 +864,7 @@ export default function CriticalAlertsView() {
 
             <div className="soc-threat-details-item">
               <span className="soc-threat-details-label">Source IP Origin</span>
-              <span className="soc-threat-details-val" style={{ fontFamily: "monospace", color: "#60a5fa" }}>
+              <span className="soc-threat-details-val" style={{ fontFamily: "monospace", color: isDark ? "#60a5fa" : "#2563eb" }}>
                 {currentActiveAlert.source_ip}
               </span>
             </div>
@@ -644,7 +897,7 @@ export default function CriticalAlertsView() {
 
             <div className="soc-threat-details-item" style={{ gridColumn: "1 / -1" }}>
               <span className="soc-threat-details-label">Containment &amp; Isolation Playbook</span>
-              <span className="soc-threat-details-val" style={{ color: "#fbbf24" }}>
+              <span className="soc-threat-details-val" style={{ color: isDark ? "#fbbf24" : "#d97706" }}>
                 {currentActiveAlert.action}
               </span>
             </div>
@@ -653,33 +906,27 @@ export default function CriticalAlertsView() {
           {/* 6. Alert Action Buttons */}
           <div className="soc-threat-actions-row">
             <button
-              onClick={() => {
-                setAlertActionMsg(`Enforced mitigation playbook on ${currentActiveAlert.id}!`);
-                setTimeout(() => setAlertActionMsg(null), 3000);
-              }}
+              onClick={() => handleExecuteContainment(currentActiveAlert.id)}
               className="soc-threat-act-btn danger"
             >
               <Zap size={14} /> Execute Containment Playbook
             </button>
 
             <button
-              onClick={() => {
-                setAlertActionMsg(`Marked alert ${currentActiveAlert.id} as Resolved!`);
-                setTimeout(() => setAlertActionMsg(null), 3000);
-              }}
+              onClick={() => handleResolveAlert(currentActiveAlert.id)}
               className="soc-threat-act-btn success"
             >
               <CheckCircle2 size={14} /> Resolve Alert
             </button>
 
-            <button onClick={handleExportSystemLogs} className="soc-threat-act-btn primary">
+            <button onClick={() => handleExportSystemLogs(currentActiveAlert)} className="soc-threat-act-btn primary">
               <FolderArchive size={14} /> Export Forensic Log
             </button>
 
             <button
               onClick={() => {
-                fetchCriticalAlerts();
-                setAlertActionMsg("Refreshed critical alerts stream!");
+                loadCriticalAlerts();
+                setAlertActionMsg("Refreshed critical alerts stream from PostgreSQL!");
                 setTimeout(() => setAlertActionMsg(null), 3000);
               }}
               className="soc-threat-act-btn secondary"
@@ -687,6 +934,16 @@ export default function CriticalAlertsView() {
               <RefreshCw size={14} /> Refresh Stream
             </button>
           </div>
+        </div>
+      ) : (
+        <div className="soc-threat-details-box red-accent" style={{ textAlign: "center", padding: "1.75rem 1rem" }}>
+          <AlertTriangle size={28} style={{ color: "#ef4444", marginBottom: "0.5rem", opacity: 0.6 }} />
+          <h4 style={{ margin: 0, color: isDark ? "#f8fafc" : "#0f172a", fontSize: "0.95rem" }}>
+            No Active Critical Alert Selected
+          </h4>
+          <p style={{ margin: "0.35rem 0 0 0", fontSize: "0.8rem", color: isDark ? "#64748b" : "#94a3b8" }}>
+            Analyze incident risk above to populate active alert details, MITRE ATT&amp;CK tags, and containment playbooks.
+          </p>
         </div>
       )}
 
@@ -756,9 +1013,6 @@ export default function CriticalAlertsView() {
           ) : criticalAlertsError ? (
             <div style={{ padding: "2rem", textAlign: "center", color: "#f87171" }}>
               {criticalAlertsError}
-              <button onClick={fetchCriticalAlerts} style={{ marginTop: "0.5rem" }} className="soc-dash-btn-refresh">
-                Retry
-              </button>
             </div>
           ) : paginatedAlerts.length > 0 ? (
             <table className="soc-dash-table">
@@ -766,6 +1020,9 @@ export default function CriticalAlertsView() {
                 <tr>
                   <th onClick={() => handleSortAlerts("id")}>
                     Alert ID {alertSortField === "id" ? (alertSortOrder === "asc" ? "▲" : "▼") : ""}
+                  </th>
+                  <th onClick={() => handleSortAlerts("timestamp")}>
+                    Timestamp {alertSortField === "timestamp" ? (alertSortOrder === "asc" ? "▲" : "▼") : ""}
                   </th>
                   <th onClick={() => handleSortAlerts("title")}>
                     Alert Title {alertSortField === "title" ? (alertSortOrder === "asc" ? "▲" : "▼") : ""}
@@ -802,6 +1059,11 @@ export default function CriticalAlertsView() {
                   >
                     <td>
                       <code>{alertItem.id}</code>
+                    </td>
+                    <td>
+                      <code style={{ fontSize: "0.775rem", color: isDark ? "#cbd5e1" : "#475569" }}>
+                        {alertItem.timestamp}
+                      </code>
                     </td>
                     <td>
                       <strong style={{ color: isDark ? "#f8fafc" : "#0f172a" }}>{alertItem.title}</strong>
@@ -843,9 +1105,12 @@ export default function CriticalAlertsView() {
               </tbody>
             </table>
           ) : (
-            <p style={{ padding: "2rem", textAlign: "center", color: "#94a3b8" }}>
-              No critical alert records matching filter criteria.
-            </p>
+            <div style={{ padding: "3rem 1.5rem", textAlign: "center", color: isDark ? "#94a3b8" : "#64748b" }}>
+              <AlertTriangle size={36} style={{ color: "#ef4444", marginBottom: "0.75rem", opacity: 0.6 }} />
+              <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 600 }}>
+                No active critical alerts logged. Enter parameters above to analyze incident risk.
+              </p>
+            </div>
           )}
         </div>
 

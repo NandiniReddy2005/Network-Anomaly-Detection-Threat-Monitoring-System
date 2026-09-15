@@ -8,7 +8,7 @@ import {
   Shield,
   BarChart3,
   FileText,
-  Settings,
+  AlertOctagon,
 } from "lucide-react";
 
 import ProtectedRoute from "../../components/ProtectedRoute";
@@ -23,31 +23,32 @@ const ROUTE_TO_TAB = {
   "/analyst": "Dashboard",
   "/analyst/dashboard": "Dashboard",
   "/analyst/network-monitoring": "Network Monitoring",
+  "/analyst/incidents": "Incident Queue",
+  "/incidents": "Incident Queue",
   "/analyst/packet-capture": "Packet Capture",
   "/analyst/traffic-analysis": "Traffic Analysis",
   "/analyst/reports": "Reports",
   "/analyst/analytics": "Analytics",
-  "/analyst/settings": "Settings",
 };
 
 const TAB_TO_ROUTE = {
   "Dashboard": "/analyst/dashboard",
   "Network Monitoring": "/analyst/network-monitoring",
+  "Incident Queue": "/analyst/incidents",
   "Packet Capture": "/analyst/packet-capture",
   "Traffic Analysis": "/analyst/traffic-analysis",
   "Reports": "/analyst/reports",
   "Analytics": "/analyst/analytics",
-  "Settings": "/analyst/settings",
 };
 
 const menuItems = [
   { name: "Dashboard", icon: <Globe size={18} /> },
   { name: "Network Monitoring", icon: <Radio size={18} /> },
+  { name: "Incident Queue", icon: <AlertOctagon size={18} /> },
   { name: "Packet Capture", icon: <Activity size={18} /> },
   { name: "Traffic Analysis", icon: <Shield size={18} /> },
   { name: "Reports", icon: <FileText size={18} /> },
   { name: "Analytics", icon: <BarChart3 size={18} /> },
-  { name: "Settings", icon: <Settings size={18} /> },
 ];
 
 export default function AnalystLayout({ children }) {
@@ -61,6 +62,12 @@ export default function AnalystLayout({ children }) {
   const activeTab = ROUTE_TO_TAB[pathname] || "Dashboard";
 
   useEffect(() => {
+    if (pathname === "/analyst/settings") {
+      router.replace("/analyst/dashboard");
+    }
+  }, [pathname, router]);
+
+  useEffect(() => {
     setCurrentTime(getFormattedUTCTime());
     const timer = setInterval(() => {
       setCurrentTime(getFormattedUTCTime());
@@ -70,8 +77,15 @@ export default function AnalystLayout({ children }) {
 
   useEffect(() => {
     const user = getCurrentUser();
-    if (user) {
+    if (user && user.email) {
       setCurrentUser(user);
+    } else {
+      setCurrentUser({
+        email: "security@gmail.com",
+        username: "security@gmail.com",
+        role: "analyst",
+        name: "Security Analyst",
+      });
     }
   }, []);
 
@@ -110,8 +124,8 @@ export default function AnalystLayout({ children }) {
 
           <div className="ns-soc-content-container">
             {children}
+            <Footer />
           </div>
-          <Footer />
         </main>
       </div>
     </ProtectedRoute>

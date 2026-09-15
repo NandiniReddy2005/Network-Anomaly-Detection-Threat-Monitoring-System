@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Shield, 
@@ -10,12 +10,15 @@ import {
   ArrowRight, 
   Sparkles,
   Search,
-  Zap
+  Zap,
+  Home,
+  Info
 } from "lucide-react";
 
 export default function LandingPage() {
   const router = useRouter();
   const canvasRef = useRef(null);
+  const [isAboutHomeHovered, setIsAboutHomeHovered] = useState(false);
 
   // Background Particles Animation
   useEffect(() => {
@@ -365,6 +368,26 @@ export default function LandingPage() {
               );
             })}
           </div>
+
+          {/* Features Section Footer Navigation */}
+          <div style={{ marginTop: "3.5rem", display: "flex", flexDirection: "row", justifyContent: "flex-start", alignItems: "center", gap: "1.25rem" }}>
+            <button
+              type="button"
+              className="landing-btn landing-btn-secondary"
+              onClick={() => router.push("/#hero")}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <span>Home</span>
+            </button>
+            <button
+              type="button"
+              className="landing-btn landing-btn-primary"
+              onClick={() => router.push("/#about")}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <span>About</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -381,6 +404,18 @@ export default function LandingPage() {
               NetShield-AI is an enterprise Security Operations Center platform developed to monitor network traffic, detect cyber attacks using AI, inspect packets, analyze threats, and provide secure role-based dashboards for Security Analysts and Security Administrators.
             </p>
           </div>
+          <div style={{ marginTop: "2.5rem", display: "flex", justifyContent: "flex-start" }}>
+            <button
+              type="button"
+              className={`landing-btn landing-btn-secondary landing-home-btn ${isAboutHomeHovered ? "hovered" : ""}`}
+              onClick={() => router.push("/#hero")}
+              onMouseEnter={() => setIsAboutHomeHovered(true)}
+              onMouseLeave={() => setIsAboutHomeHovered(false)}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <span>Home</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -395,7 +430,6 @@ export default function LandingPage() {
             <p className="landing-footer-subtitle">Enterprise SOC Security Gateway</p>
           </div>
           <div className="landing-footer-copyright">
-            © 2026 NetShield-AI
           </div>
         </div>
       </footer>

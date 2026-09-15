@@ -3,10 +3,12 @@ import socket
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase
 
-PG_DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/netshield_ai"
-)
+try:
+    from app.core.config import settings
+except ImportError:
+    from backend.app.core.config import settings
+
+PG_DATABASE_URL = settings.DATABASE_URL
 
 SQLITE_DATABASE_URL = "sqlite+aiosqlite:///d:/NetShield-AI/backend/netshield_ai.db"
 

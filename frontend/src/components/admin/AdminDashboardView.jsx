@@ -102,6 +102,7 @@ export default function AdminDashboardView() {
   const { isDark } = useTheme();
   const [currentUser, setCurrentUser] = useState(null);
   const [currentTime, setCurrentTime] = useState("");
+  const [mlStatus, setMlStatus] = useState(null);
 
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -124,6 +125,19 @@ export default function AdminDashboardView() {
   const [loadingThreatChart, setLoadingThreatChart] = useState(true);
   const [threatChartError, setThreatChartError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hoveredModuleIndex, setHoveredModuleIndex] = useState(null);
+  const [dashboardStatus, setDashboardStatus] = useState(null);
+
+  const fetchDashboardStatus = useCallback(async () => {
+    try {
+      const res = await fetchApi("/api/dashboard/status");
+      if (res && (res.status === "success" || res.system_gateway_status)) {
+        setDashboardStatus(res);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch dashboard status:", err);
+    }
+  }, []);
 
   useEffect(() => {
     setCurrentTime(getFormattedUTCTime());
@@ -218,13 +232,14 @@ export default function AdminDashboardView() {
         fetchCriticalAlerts(),
         fetchAuditLogs(),
         fetchThreatChart(),
+        fetchDashboardStatus(),
       ]);
     } catch (err) {
       console.error("Dashboard refresh error:", err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [fetchStats, fetchUsers, fetchIncidents, fetchThreats, fetchCriticalAlerts, fetchAuditLogs, fetchThreatChart]);
+  }, [fetchStats, fetchUsers, fetchIncidents, fetchThreats, fetchCriticalAlerts, fetchAuditLogs, fetchThreatChart, fetchDashboardStatus]);
 
   useEffect(() => {
     fetchStats();
@@ -234,7 +249,14 @@ export default function AdminDashboardView() {
     fetchCriticalAlerts();
     fetchAuditLogs();
     fetchThreatChart();
-  }, [fetchStats, fetchUsers, fetchIncidents, fetchThreats, fetchCriticalAlerts, fetchAuditLogs, fetchThreatChart]);
+    fetchDashboardStatus();
+
+    const statusInterval = setInterval(() => {
+      fetchDashboardStatus();
+    }, 5000);
+
+    return () => clearInterval(statusInterval);
+  }, [fetchStats, fetchUsers, fetchIncidents, fetchThreats, fetchCriticalAlerts, fetchAuditLogs, fetchThreatChart, fetchDashboardStatus]);
 
   const handleExportSystemLogs = () => {
     if (auditLogs && auditLogs.length > 0) {
@@ -329,9 +351,9 @@ export default function AdminDashboardView() {
           </h2>
           <div className="soc-dash-header-sub">
             <span>
-              Welcome back,{" "}
+              Welcome,{" "}
               <strong style={{ color: isDark ? "#f8fafc" : "#0f172a" }}>
-                {currentUser?.email || currentUser?.username || "Administrator"}
+                Security Administrator
               </strong>
             </span>
             <span>•</span>
@@ -356,463 +378,326 @@ export default function AdminDashboardView() {
         </div>
       </div>
 
-      {/* 2. 8 KPI Cards Grid */}
-      <div className="soc-dash-kpi-grid">
+      {/* 2. Operational Telemetry & System Status Cards (4 Standalone PostgreSQL Metric Cards) */}
+      <div className="soc-dash-kpi-grid" style={{ marginBottom: "1.5rem" }}>
+        {/* Card 1: System Gateway Status */}
         <div className="soc-dash-kpi-card">
           <div className="soc-dash-kpi-top">
-            <span className="soc-dash-kpi-title">Total Users</span>
-            <div className="soc-dash-kpi-icon blue">
-              <Users size={18} />
-            </div>
-          </div>
-          <div className="soc-dash-kpi-metric">{usersList.length || 14}</div>
-          <div className="soc-dash-kpi-bottom">
-            <span className="soc-dash-trend-tag up">
-              <TrendingUp size={12} /> Registered
-            </span>
-            <span>System accounts</span>
-          </div>
-        </div>
-
-        <div className="soc-dash-kpi-card">
-          <div className="soc-dash-kpi-top">
-            <span className="soc-dash-kpi-title">Security Analysts</span>
-            <div className="soc-dash-kpi-icon cyan">
-              <UserCheck size={18} />
-            </div>
-          </div>
-          <div className="soc-dash-kpi-metric">
-            {usersList.filter((u) => u.role === "analyst").length || 8}
-          </div>
-          <div className="soc-dash-kpi-bottom">
-            <span className="soc-dash-trend-tag stable">
-              <Activity size={12} /> Active
-            </span>
-            <span>Analyst roster</span>
-          </div>
-        </div>
-
-        <div className="soc-dash-kpi-card">
-          <div className="soc-dash-kpi-top">
-            <span className="soc-dash-kpi-title">Administrators</span>
-            <div className="soc-dash-kpi-icon purple">
-              <ShieldCheck size={18} />
-            </div>
-          </div>
-          <div className="soc-dash-kpi-metric">
-            {usersList.filter((u) => u.role === "admin").length || 3}
-          </div>
-          <div className="soc-dash-kpi-bottom">
-            <span className="soc-dash-trend-tag up">
-              <Lock size={12} /> Full Access
-            </span>
-            <span>Privileged role</span>
-          </div>
-        </div>
-
-        <div className="soc-dash-kpi-card">
-          <div className="soc-dash-kpi-top">
-            <span className="soc-dash-kpi-title">Network Devices</span>
+            <span className="soc-dash-kpi-title">System Gateway Status</span>
             <div className="soc-dash-kpi-icon green">
-              <Server size={18} />
+              <Server size={18} style={{ color: "#10b981" }} />
             </div>
           </div>
-          <div className="soc-dash-kpi-metric">1,482</div>
+          <div className="soc-dash-kpi-metric" style={{ fontSize: "1.05rem", fontWeight: 700, color: "#10b981" }}>
+            {dashboardStatus?.system_gateway_status || "Operational (200 OK)"}
+          </div>
           <div className="soc-dash-kpi-bottom">
             <span className="soc-dash-trend-tag up">
-              <CheckCircle2 size={12} /> 100% UP
+              <CheckCircle2 size={12} /> Active
             </span>
-            <span>Trusted endpoints</span>
+            <span>PostgreSQL Gateway Status</span>
           </div>
         </div>
 
+        {/* Card 2: FastAPI ML Pipeline State */}
         <div className="soc-dash-kpi-card">
           <div className="soc-dash-kpi-top">
-            <span className="soc-dash-kpi-title">Active Threats</span>
-            <div className="soc-dash-kpi-icon orange">
-              <ShieldAlert size={18} />
+            <span className="soc-dash-kpi-title">FastAPI ML Pipeline State</span>
+            <div className="soc-dash-kpi-icon cyan">
+              <Zap size={18} style={{ color: "#38bdf8" }} />
             </div>
           </div>
-          <div className="soc-dash-kpi-metric">
-            {threatsList.length || incidents.length || 6}
+          <div className="soc-dash-kpi-metric" style={{ fontSize: "1.05rem", fontWeight: 700, color: "#38bdf8" }}>
+            {dashboardStatus?.ml_engine_status || "Engine Active (UNSW-NB15 / CICIDS2017)"}
           </div>
-          <div className="soc-dash-kpi-bottom">
-            <span className="soc-dash-trend-tag warning">
-              <AlertCircle size={12} /> Triage Queue
-            </span>
-            <span>Anomalous vectors</span>
-          </div>
-        </div>
-
-        <div className="soc-dash-kpi-card">
-          <div className="soc-dash-kpi-top">
-            <span className="soc-dash-kpi-title">System Uptime</span>
-            <div className="soc-dash-kpi-icon emerald">
-              <Activity size={18} />
-            </div>
-          </div>
-          <div className="soc-dash-kpi-metric">{stats?.system_health || "99.98%"}</div>
           <div className="soc-dash-kpi-bottom">
             <span className="soc-dash-trend-tag up">
-              <CheckCircle2 size={12} /> SLA Met
+              ● Neural Engine
             </span>
-            <span>Cluster health</span>
+            <span>Dual Model Inference</span>
           </div>
         </div>
 
+        {/* Card 3: Telemetry Ingestion Rate */}
         <div className="soc-dash-kpi-card">
           <div className="soc-dash-kpi-top">
-            <span className="soc-dash-kpi-title">Detection Accuracy</span>
-            <div className="soc-dash-kpi-icon blue">
-              <Zap size={18} />
+            <span className="soc-dash-kpi-title">Telemetry Ingestion Rate</span>
+            <div className="soc-dash-kpi-icon purple">
+              <Activity size={18} style={{ color: "#a855f7" }} />
             </div>
           </div>
-          <div className="soc-dash-kpi-metric">98.4%</div>
+          <div className="soc-dash-kpi-metric" style={{ fontSize: "1.25rem", fontWeight: 700, color: "#a855f7" }}>
+            {dashboardStatus?.telemetry_rate || "1.4k req/sec"}
+          </div>
           <div className="soc-dash-kpi-bottom">
-            <span className="soc-dash-trend-tag stable">
-              <ShieldCheck size={12} /> AI Active
+            <span className="soc-dash-trend-tag up">
+              ⚡ Ingesting Live
             </span>
-            <span>Neural model</span>
+            <span>PostgreSQL Traffic Metrics</span>
           </div>
         </div>
 
+        {/* Card 4: Active Incident Queue */}
         <div className="soc-dash-kpi-card">
           <div className="soc-dash-kpi-top">
-            <span className="soc-dash-kpi-title">Critical Alerts</span>
+            <span className="soc-dash-kpi-title">Active Incident Queue</span>
             <div className="soc-dash-kpi-icon red">
-              <AlertTriangle size={18} style={{ color: "#ef4444" }} />
+              <AlertCircle size={18} style={{ color: "#f59e0b" }} />
             </div>
           </div>
-          <div className="soc-dash-kpi-metric">
-            {stats?.critical_alerts || criticalAlerts.length || 4}
+          <div className="soc-dash-kpi-metric" style={{ fontSize: "1.15rem", fontWeight: 700, color: "#f59e0b" }}>
+            {dashboardStatus?.active_incidents_count !== undefined ? `${dashboardStatus.active_incidents_count} P1/P2 Alerts Active` : "2 P1/P2 Alerts Active"}
           </div>
           <div className="soc-dash-kpi-bottom">
             <span className="soc-dash-trend-tag warning">
-              <AlertCircle size={12} /> Action Needed
+              ⚠️ Triage Queue
             </span>
-            <span>High severity</span>
+            <span>PostgreSQL Incident Ledger</span>
           </div>
         </div>
       </div>
 
-      {/* 8. Quick Actions Shortcuts */}
+      {/* Security Administrator Operations & System Governance */}
       <div className="soc-dash-card">
         <div className="soc-dash-card-header">
           <h3 className="soc-dash-card-title">
-            <Sliders size={18} style={{ color: "#3b82f6" }} />
-            Administrative Quick Actions
+            <ShieldCheck size={18} style={{ color: "#38bdf8" }} />
+            Security Administrator Operations &amp; System Governance
           </h3>
-          <span className="soc-dash-badge">Console Shortcuts</span>
-        </div>
-        <div className="admin-dash-quick-grid">
-          <div className="admin-dash-quick-card" onClick={() => router.push("/admin/user-management")}>
-            <div className="admin-dash-quick-icon">
-              <Users size={20} />
-            </div>
-            <span className="admin-dash-quick-label">Manage Users</span>
-          </div>
-
-          <div className="admin-dash-quick-card" onClick={() => router.push("/admin/user-management")}>
-            <div className="admin-dash-quick-icon">
-              <KeyRound size={20} />
-            </div>
-            <span className="admin-dash-quick-label">Manage Roles</span>
-          </div>
-
-          <div className="admin-dash-quick-card" onClick={() => router.push("/admin/settings")}>
-            <div className="admin-dash-quick-icon">
-              <Sliders size={20} />
-            </div>
-            <span className="admin-dash-quick-label">Configuration</span>
-          </div>
-
-          <div className="admin-dash-quick-card" onClick={() => router.push("/admin/audit-logs")}>
-            <div className="admin-dash-quick-icon">
-              <FileSearch size={20} />
-            </div>
-            <span className="admin-dash-quick-label">Audit Logs</span>
-          </div>
-
-          <div className="admin-dash-quick-card" onClick={() => router.push("/admin/activity-security")}>
-            <div className="admin-dash-quick-icon">
-              <Lock size={20} />
-            </div>
-            <span className="admin-dash-quick-label">Security Policies</span>
-          </div>
-
-          <div className="admin-dash-quick-card" onClick={handleExportSystemLogs}>
-            <div className="admin-dash-quick-icon">
-              <FolderArchive size={20} />
-            </div>
-            <span className="admin-dash-quick-label">Backup &amp; Export</span>
-          </div>
-
-          <div className="admin-dash-quick-card" onClick={() => router.push("/admin/settings")}>
-            <div className="admin-dash-quick-icon">
-              <Zap size={20} />
-            </div>
-            <span className="admin-dash-quick-label">AI Engine Settings</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3 & 4. Security Overview Chart & Threat Summary Breakdown */}
-      <div className="soc-dash-charts-dual-row">
-        {/* 3. Security Overview Chart */}
-        <div className="soc-dash-card">
-          <div className="soc-dash-card-header">
-            <h3 className="soc-dash-card-title">
-              <Activity size={18} style={{ color: "#ef4444" }} />
-              Security Overview &amp; Threat Trends
-            </h3>
-            <span className="soc-dash-badge">Real-time Telemetry</span>
-          </div>
-          <div style={{ width: "100%", height: 260 }}>
-            {loadingThreatChart ? (
-              <LoadingSpinner text="Fetching threat analysis metrics..." />
-            ) : threatChartError ? (
-              <div style={{ padding: "2rem", color: "#f87171", textAlign: "center" }}>
-                {threatChartError}
-                <button onClick={fetchThreatChart} style={{ marginLeft: "10px" }} className="soc-dash-btn-refresh">
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={formattedThreatChart} margin={{ top: 10, right: 30, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="adminVolGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "rgba(255,255,255,0.06)" : "#e2e8f0"} />
-                  <XAxis dataKey="time" stroke={isDark ? "#64748b" : "#475569"} fontSize={11} tickLine={false} />
-                  <YAxis yAxisId="left" stroke={isDark ? "#64748b" : "#475569"} fontSize={11} tickLine={false} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#ef4444" fontSize={11} tickLine={false} />
-                  <Tooltip content={<CustomAdminTooltip />} />
-                  <Legend wrapperStyle={{ paddingTop: "10px", fontSize: "0.8rem", color: isDark ? "#cbd5e1" : "#334155" }} />
-                  <Area yAxisId="left" type="monotone" dataKey="volume" name="Telemetry Volume (Mbps)" stroke="#3b82f6" fill="url(#adminVolGrad)" />
-                  <Line yAxisId="right" type="monotone" dataKey="score" name="Anomaly Score" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 3, fill: "#ef4444" }} activeDot={{ r: 6 }} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
-        {/* 4. Threat Summary Breakdown */}
-        <div className="soc-dash-card">
-          <div className="soc-dash-card-header">
-            <h3 className="soc-dash-card-title">
-              <ShieldAlert size={18} style={{ color: "#f59e0b" }} />
-              Threat Severity Summary
-            </h3>
-            <span className="soc-dash-badge">Incident Breakdown</span>
-          </div>
-          <div className="admin-dash-threat-grid" style={{ paddingTop: "0.5rem" }}>
-            <div className="admin-dash-threat-card critical">
-              <span className="admin-dash-threat-title">Critical Severity</span>
-              <span className="admin-dash-threat-val">2</span>
-              <span className="admin-dash-threat-sub">P1 Emergency vectors</span>
-            </div>
-            <div className="admin-dash-threat-card high">
-              <span className="admin-dash-threat-title">High Severity</span>
-              <span className="admin-dash-threat-val">3</span>
-              <span className="admin-dash-threat-sub">Elevated anomaly scores</span>
-            </div>
-            <div className="admin-dash-threat-card medium">
-              <span className="admin-dash-threat-title">Medium Severity</span>
-              <span className="admin-dash-threat-val">4</span>
-              <span className="admin-dash-threat-sub">Under active review</span>
-            </div>
-            <div className="admin-dash-threat-card low">
-              <span className="admin-dash-threat-title">Low Severity</span>
-              <span className="admin-dash-threat-val">3</span>
-              <span className="admin-dash-threat-sub">Informational probes</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 7. Recent Administrative Activities (Audit Log Table) */}
-      <div className="soc-dash-table-card">
-        <div className="soc-dash-table-toolbar">
-          <div className="soc-dash-card-header" style={{ border: "none", padding: 0, gap: "0.75rem" }}>
-            <h3 className="soc-dash-card-title">
-              <FileText size={18} style={{ color: "#a855f7" }} />
-              Administrative Audit Log
-            </h3>
-            <span className="soc-dash-badge">PostgreSQL Audit Trail</span>
-          </div>
-
-          <div className="soc-dash-table-search">
-            <Search size={15} style={{ color: "#94a3b8" }} />
-            <input
-              type="text"
-              placeholder="Search audit trail by actor, action, IP..."
-              value={auditSearchQuery}
-              onChange={(e) => {
-                setAuditSearchQuery(e.target.value);
-                setAuditPage(1);
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="soc-dash-table-wrapper">
-          {loadingAuditLogs ? (
-            <LoadingSpinner text="Fetching audit logs from PostgreSQL backend..." />
-          ) : auditLogsError ? (
-            <div style={{ padding: "2rem", textAlign: "center", color: "#f87171" }}>
-              {auditLogsError}
-              <button onClick={fetchAuditLogs} style={{ marginTop: "0.5rem" }} className="soc-dash-btn-refresh">
-                Retry
-              </button>
-            </div>
-          ) : paginatedAuditLogs.length > 0 ? (
-            <table className="soc-dash-table">
-              <thead>
-                <tr>
-                  <th onClick={() => handleSortAudit("timestamp")}>
-                    Timestamp {auditSortField === "timestamp" ? (auditSortOrder === "asc" ? "▲" : "▼") : ""}
-                  </th>
-                  <th onClick={() => handleSortAudit("actor")}>
-                    Administrator {auditSortField === "actor" ? (auditSortOrder === "asc" ? "▲" : "▼") : ""}
-                  </th>
-                  <th onClick={() => handleSortAudit("action")}>
-                    Action {auditSortField === "action" ? (auditSortOrder === "asc" ? "▲" : "▼") : ""}
-                  </th>
-                  <th onClick={() => handleSortAudit("ip_origin")}>
-                    Target / IP Origin {auditSortField === "ip_origin" ? (auditSortOrder === "asc" ? "▲" : "▼") : ""}
-                  </th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedAuditLogs.map((log, index) => (
-                  <tr key={index}>
-                    <td>{log.timestamp || "Just now"}</td>
-                    <td>
-                      <strong style={{ color: isDark ? "#f8fafc" : "#0f172a" }}>{log.actor || "admin"}</strong>
-                    </td>
-                    <td>{log.action || "Policy Update"}</td>
-                    <td>
-                      <code>{log.ip_origin || "192.168.1.1"}</code>
-                    </td>
-                    <td>
-                      <span className="soc-dash-badge-status normal">Success</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p style={{ padding: "2rem", textAlign: "center", color: "#94a3b8" }}>
-              No audit log records found in database.
-            </p>
-          )}
-        </div>
-
-        {/* Table Pagination */}
-        <div className="soc-dash-pagination">
-          <span className="soc-dash-pagination-info">
-            Showing {paginatedAuditLogs.length > 0 ? (auditPage - 1) * auditPerPage + 1 : 0} to{" "}
-            {Math.min(auditPage * auditPerPage, filteredAndSortedAuditLogs.length)} of{" "}
-            {filteredAndSortedAuditLogs.length} entries
+          <span className="soc-dash-badge" style={{ background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8" }}>
+            Executive Overview
           </span>
-          <div className="soc-dash-pagination-controls">
-            <button
-              disabled={auditPage <= 1}
-              onClick={() => setAuditPage((prev) => Math.max(prev - 1, 1))}
-              className="soc-dash-page-btn"
-            >
-              <ChevronLeft size={14} /> Prev
-            </button>
-            <span style={{ fontSize: "0.8rem", padding: "0 0.5rem", color: isDark ? "#cbd5e1" : "#334155" }}>
-              Page {auditPage} of {totalAuditPages}
-            </span>
-            <button
-              disabled={auditPage >= totalAuditPages}
-              onClick={() => setAuditPage((prev) => Math.min(prev + 1, totalAuditPages))}
-              className="soc-dash-page-btn"
-            >
-              Next <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 9. Recent Critical System Alerts Panel */}
-      <div className="soc-dash-card">
-        <div className="soc-dash-card-header">
-          <h3 className="soc-dash-card-title">
-            <AlertTriangle size={18} style={{ color: "#ef4444" }} />
-            Recent System Alerts
-          </h3>
-          <span className="soc-dash-badge">Priority Triage</span>
         </div>
 
-        {loadingCriticalAlerts ? (
-          <LoadingSpinner text="Fetching critical alerts..." />
-        ) : criticalAlertsError ? (
-          <div style={{ padding: "1rem", color: "#f87171", textAlign: "center" }}>
-            {criticalAlertsError}
-          </div>
-        ) : (
-          <div className="soc-dash-alerts-list">
-            {(criticalAlerts.length > 0
-              ? criticalAlerts
-              : [
-                  {
-                    id: 201,
-                    title: "Unauthorized Root Access Attempt Suppressed",
-                    severity: "Critical",
-                    updated: "3 mins ago",
-                    status: "Investigating",
-                  },
-                  {
-                    id: 202,
-                    title: "Subnet Traffic Anomaly Score Threshold Exceeded",
-                    severity: "High",
-                    updated: "12 mins ago",
-                    status: "Open",
-                  },
-                  {
-                    id: 203,
-                    title: "FastAPI Rate Limit Triggered on Endpoint /api/telemetry",
-                    severity: "Medium",
-                    updated: "25 mins ago",
-                    status: "Resolved",
-                  },
-                ]
-            ).map((alertItem, idx) => (
-              <div
-                key={alertItem.id || idx}
-                className={`soc-dash-alert-item ${alertItem.severity.toLowerCase()}`}
-              >
-                <div className="soc-dash-alert-left">
-                  <span className="soc-dash-alert-title">{alertItem.title}</span>
-                  <div className="soc-dash-alert-meta">
-                    <span>
-                      <Clock size={12} /> {alertItem.updated || "Just now"}
-                    </span>
-                    <span>•</span>
-                    <span>Assigned: {alertItem.analyst || "Admin Team"}</span>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.75rem",
+            paddingTop: "0.75rem",
+          }}
+        >
+          {/* Subsection A: Administrator Responsibilities & Core Governance */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+              <h4 style={{ margin: 0, fontSize: "0.925rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                Administrator Responsibilities &amp; Core Governance
+              </h4>
+            </div>
+
+            {[
+              {
+                title: "Full System Telemetry Oversight",
+                desc: "Continuously monitor real-time network flow anomalies, machine learning inference engines, and cluster health metrics.",
+                icon: Activity,
+                color: "#38bdf8",
+              },
+              {
+                title: "Incident Containment & Response",
+                desc: "Execute automated mitigation playbooks, isolate compromised source IPs, and handle P1 Emergency/P2 High Risk alerts.",
+                icon: Zap,
+                color: "#ef4444",
+              },
+              {
+                title: "Identity & Access Governance (RBAC)",
+                desc: "Manage system users, provision Security Analyst roles, and enforce least-privilege administrative access policies.",
+                icon: Users,
+                color: "#a855f7",
+              },
+              {
+                title: "Audit Compliance & System Security",
+                desc: "Track all system interactions via immutable PostgreSQL audit logs and verify model features (UNSW-NB15 / CICIDS2017).",
+                icon: FileText,
+                color: "#10b981",
+              },
+            ].map((resp, idx) => {
+              const RespIcon = resp.icon;
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    padding: "0.85rem 1rem",
+                    borderRadius: "8px",
+                    background: isDark ? "rgba(30, 41, 59, 0.6)" : "#f8fafc",
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0",
+                    display: "flex",
+                    gap: "0.75rem",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "0.5rem",
+                      borderRadius: "6px",
+                      background: `rgba(${resp.color === "#38bdf8" ? "56, 189, 248" : resp.color === "#ef4444" ? "239, 68, 68" : resp.color === "#a855f7" ? "168, 85, 247" : "16, 185, 129"}, 0.15)`,
+                      color: resp.color,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <RespIcon size={16} />
+                  </div>
+                  <div>
+                    <h5 style={{ margin: "0 0 0.2rem 0", fontSize: "0.875rem", fontWeight: 600, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                      {resp.title}
+                    </h5>
+                    <p style={{ margin: 0, fontSize: "0.8rem", color: isDark ? "#94a3b8" : "#64748b", lineHeight: 1.45 }}>
+                      {resp.desc}
+                    </p>
                   </div>
                 </div>
-                <div className="soc-dash-alert-right">
-                  <span className={`soc-dash-badge-status ${alertItem.severity.toLowerCase()}`}>
-                    {alertItem.severity}
-                  </span>
-                  <span className={`soc-dash-badge-status ${alertItem.status === "Resolved" ? "normal" : "warning"}`}>
-                    {alertItem.status}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        )}
+
+          {/* Subsection B: Platform Modules Overview & Purpose */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+              <h4 style={{ margin: 0, fontSize: "0.925rem", fontWeight: 700, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                Platform Modules Overview &amp; Purpose
+              </h4>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.75rem" }}>
+              {[
+                {
+                  title: "Dashboard (Executive Hub)",
+                  desc: "High-level view of system health, real-time threat volume, active alerts, and SLA metrics.",
+                  icon: TrendingUp,
+                  badge: "● Executive Hub",
+                  badgeColor: "#38bdf8",
+                  badgeBg: "rgba(56, 189, 248, 0.12)",
+                  route: "/admin/dashboard",
+                },
+                {
+                  title: "Activity Security",
+                  desc: "Monitors incoming network traffic streams, live telemetry events, and packet anomalies.",
+                  icon: Activity,
+                  badge: `● ${dashboardStatus?.activity_stream_status || "Streaming Live"}`,
+                  badgeColor: "#10b981",
+                  badgeBg: "rgba(16, 185, 129, 0.12)",
+                  route: "/admin/activity-security",
+                },
+                {
+                  title: "Threats (Predictive ML Lab)",
+                  desc: "Interactive analyzer for testing custom IPv4 network traffic against ML pipelines to predict threat scores and severity levels.",
+                  icon: Zap,
+                  badge: `● ${dashboardStatus?.threat_anomalies_count !== undefined ? dashboardStatus.threat_anomalies_count : 3} Anomalies Detected`,
+                  badgeColor: "#f59e0b",
+                  badgeBg: "rgba(245, 158, 11, 0.12)",
+                  route: "/admin/threats",
+                },
+                {
+                  title: "Critical Alerts (Triage Center)",
+                  desc: "Command center for triaging emergency events, tracking response SLAs, and executing containment playbooks.",
+                  icon: ShieldAlert,
+                  badge: `● ${dashboardStatus?.active_incidents_count !== undefined ? dashboardStatus.active_incidents_count : 2} Action Required`,
+                  badgeColor: "#ef4444",
+                  badgeBg: "rgba(239, 68, 68, 0.12)",
+                  route: "/admin/critical-alerts",
+                },
+                {
+                  title: "System Help (SOC Knowledge Base)",
+                  desc: "AI-assisted documentation portal providing instant answers to networking, ML model, and operational queries.",
+                  icon: FileSearch,
+                  badge: "● AI Assistant Online",
+                  badgeColor: "#a855f7",
+                  badgeBg: "rgba(168, 85, 247, 0.12)",
+                  route: "/admin/system-help",
+                },
+                {
+                  title: "User Management & Audit Logs",
+                  desc: "Role assignment interface and immutable logging database tracking all administrative actions.",
+                  icon: UserCheck,
+                  badge: "● Audit Trail Active",
+                  badgeColor: "#6366f1",
+                  badgeBg: "rgba(99, 102, 241, 0.12)",
+                  route: "/admin/user-management",
+                },
+              ].map((mod, idx) => {
+                const ModIcon = mod.icon;
+                const isHovered = hoveredModuleIndex === idx;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      if (mod.route === "/admin/dashboard") {
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      } else {
+                        router.push(mod.route);
+                      }
+                    }}
+                    onMouseEnter={() => setHoveredModuleIndex(idx)}
+                    onMouseLeave={() => setHoveredModuleIndex(null)}
+                    style={{
+                      padding: "0.85rem 1rem",
+                      borderRadius: "8px",
+                      background: isHovered
+                        ? (isDark ? "rgba(59, 130, 246, 0.18)" : "#eff6ff")
+                        : (isDark ? "rgba(30, 41, 59, 0.4)" : "#f8fafc"),
+                      border: isHovered
+                        ? (isDark ? "1px solid rgba(59, 130, 246, 0.5)" : "1px solid #3b82f6")
+                        : (isDark ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid #e2e8f0"),
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.4rem",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease-in-out",
+                      boxShadow: isHovered ? "0 4px 12px rgba(59, 130, 246, 0.2)" : "none",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <div
+                          style={{
+                            padding: "0.4rem",
+                            borderRadius: "6px",
+                            background: isHovered ? "rgba(59, 130, 246, 0.25)" : "rgba(168, 85, 247, 0.15)",
+                            color: isHovered ? "#3b82f6" : "#a855f7",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s ease-in-out",
+                          }}
+                        >
+                          <ModIcon size={14} />
+                        </div>
+                        <h5 style={{ margin: 0, fontSize: "0.825rem", fontWeight: 600, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                          {mod.title}
+                        </h5>
+                      </div>
+                      {mod.badge && (
+                        <span
+                          style={{
+                            fontSize: "0.675rem",
+                            fontWeight: 600,
+                            padding: "0.15rem 0.45rem",
+                            borderRadius: "12px",
+                            background: mod.badgeBg,
+                            color: mod.badgeColor,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {mod.badge}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: "0.775rem", color: isDark ? "#94a3b8" : "#64748b", lineHeight: 1.4 }}>
+                      {mod.desc}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
+
+
+
+
     </div>
   );
 }

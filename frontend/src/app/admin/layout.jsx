@@ -9,7 +9,6 @@ import {
   HelpCircle,
   Users,
   FileText,
-  Settings,
 } from "lucide-react";
 
 import ProtectedRoute from "../../components/ProtectedRoute";
@@ -31,7 +30,6 @@ const ROUTE_TO_TAB = {
   "/admin/system-health": "System Help",
   "/admin/user-management": "User Management",
   "/admin/audit-logs": "Audit Logs",
-  "/admin/settings": "Settings",
 };
 
 const TAB_TO_ROUTE = {
@@ -42,7 +40,6 @@ const TAB_TO_ROUTE = {
   "System Help": "/admin/system-help",
   "User Management": "/admin/user-management",
   "Audit Logs": "/admin/audit-logs",
-  "Settings": "/admin/settings",
 };
 
 const menuItems = [
@@ -53,7 +50,6 @@ const menuItems = [
   { name: "System Help", icon: <HelpCircle size={18} /> },
   { name: "User Management", icon: <Users size={18} /> },
   { name: "Audit Logs", icon: <FileText size={18} /> },
-  { name: "Settings", icon: <Settings size={18} /> },
 ];
 
 export default function AdminLayout({ children }) {
@@ -66,6 +62,12 @@ export default function AdminLayout({ children }) {
   const [notificationCount, setNotificationCount] = useState(3);
 
   const activeTab = ROUTE_TO_TAB[pathname] || "Dashboard";
+
+  useEffect(() => {
+    if (pathname === "/admin/settings") {
+      router.replace("/admin/dashboard");
+    }
+  }, [pathname, router]);
 
   useEffect(() => {
     setCurrentTime(getFormattedUTCTime());

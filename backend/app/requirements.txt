@@ -3,7 +3,13 @@ uvicorn==0.28.0
 sqlalchemy==2.0.28
 asyncpg==0.29.0
 pydantic-settings==2.2.1
+httpx>=0.27.0
 python-dotenv==1.0.1
 scapy==2.5.0
 passlib==1.7.4
 bcrypt==4.0.1
+scikit-learn>=1.4.0
+joblib>=1.3.0
+pandas>=2.0.0
+numpy>=1.24.0
+psutil>=5.9.0
