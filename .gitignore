@@ -37,3 +37,7 @@ frontend/.env.local
 NetShield_AI_Milestone_2/datasets/
 NetShield_AI_Milestone_2/models/
 NetShield_AI_Milestone_2/results/
+
+git rm -r --cached NetShield_AI_Milestone_2/datasets/
+git rm -r --cached NetShield_AI_Milestone_2/models/
+git rm -r --cached NetShield_AI_Milestone_2/results/
