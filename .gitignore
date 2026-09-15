@@ -33,3 +33,7 @@ backend/*.db
 
 # Frontend environment
 frontend/.env.local
+
+NetShield_AI_Milestone_2/datasets/
+NetShield_AI_Milestone_2/models/
+NetShield_AI_Milestone_2/results/
