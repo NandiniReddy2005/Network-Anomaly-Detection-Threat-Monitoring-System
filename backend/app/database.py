@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.orm import DeclarativeBase
 
 try:
-    from app.core.config import settings
-except ImportError:
     from core.config import settings
+except ImportError:
+    from app.core.config import settings
 
 PG_DATABASE_URL = settings.DATABASE_URL
 
