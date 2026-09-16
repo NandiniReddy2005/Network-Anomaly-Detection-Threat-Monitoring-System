@@ -17,7 +17,7 @@ try:
     from app.routers import telemetry, auth_routes, dashboard, analyst, ml_routes, ml_prediction_routes, network_router, incidents, reports, notifications, analytics, workflow, analyst_activity, monitoring, pcap_router, traffic_router
     from app.services.ml_manager import ml_manager
 except ImportError:
-    from backend.app.database import engine, Base, AsyncSessionLocal
+    from database import engine, Base, AsyncSessionLocal
     from backend.app.models import User, AdminIncident, AuditLog, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, Incident, IncidentAction, UserActivityLog, PcapSession, PcapPacket, EnterpriseThreatRecord, CriticalAlert, CriticalAlertAction
 
     from backend.app.auth import hash_password
