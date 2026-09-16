@@ -6,7 +6,7 @@ from sqlalchemy.orm import DeclarativeBase
 try:
     from app.core.config import settings
 except ImportError:
-    from backend.app.core.config import settings
+    from core.config import settings
 
 PG_DATABASE_URL = settings.DATABASE_URL
 
