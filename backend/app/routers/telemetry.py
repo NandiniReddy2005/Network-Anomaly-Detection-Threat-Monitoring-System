@@ -10,11 +10,15 @@ from typing import Optional
 logger = logging.getLogger("netshield_backend")
 
 try:
-    from app.database import get_db
-    from app.models import SecurityLog, TrafficMetric
+    from database import get_db
+    from models import SecurityLog, TrafficMetric
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import SecurityLog, TrafficMetric
+    try:
+        from app.database import get_db
+        from app.models import SecurityLog, TrafficMetric
+    except ImportError:
+        from backend.app.database import get_db
+        from backend.app.models import SecurityLog, TrafficMetric
 
 router = APIRouter(prefix="/api/telemetry", tags=["Telemetry"])
 logs_router = APIRouter(prefix="/api/logs", tags=["Logs"])
