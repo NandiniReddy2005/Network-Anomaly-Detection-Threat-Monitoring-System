@@ -2,9 +2,12 @@ from typing import Optional
 from sqlalchemy import String, Text, Boolean, Integer, Float, DateTime, ForeignKey, BigInteger, func
 from sqlalchemy.orm import Mapped, mapped_column
 try:
-    from app.database import Base
+    from database import Base
 except ImportError:
-    from backend.app.database import Base
+    try:
+        from app.database import Base
+    except ImportError:
+        from backend.app.database import Base
 
 class SecurityLog(Base):
     __tablename__ = "security_logs"
@@ -251,4 +254,4 @@ class CriticalAlertAction(Base):
 
 
 
-
+
