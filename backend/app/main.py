@@ -10,25 +10,11 @@ import requests
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("netshield_backend")
 
-try:
-    from database import engine, Base, AsyncSessionLocal
-    from models import User, AdminIncident, AuditLog, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, Incident, IncidentAction, UserActivityLog, PcapSession, PcapPacket, EnterpriseThreatRecord, CriticalAlert, CriticalAlertAction
-    from auth import hash_password
-    from routers import telemetry, auth_routes, dashboard, analyst, ml_routes, ml_prediction_routes, network_router, incidents, reports, notifications, analytics
-    from services.ml_manager import ml_manager
-except ImportError:
-    try:
-        from app.database import engine, Base, AsyncSessionLocal
-        from app.models import User, AdminIncident, AuditLog, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, Incident, IncidentAction, UserActivityLog, PcapSession, PcapPacket, EnterpriseThreatRecord, CriticalAlert, CriticalAlertAction
-        from app.auth import hash_password
-        from app.routers import telemetry, auth_routes, dashboard, analyst, ml_routes, ml_prediction_routes, network_router, incidents, reports, notifications, analytics
-        from app.services.ml_manager import ml_manager
-    except ImportError:
-        from backend.app.database import engine, Base, AsyncSessionLocal
-        from backend.app.models import User, AdminIncident, AuditLog, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, Incident, IncidentAction, UserActivityLog, PcapSession, PcapPacket, EnterpriseThreatRecord, CriticalAlert, CriticalAlertAction
-        from backend.app.auth import hash_password
-        from backend.app.routers import telemetry, auth_routes, dashboard, analyst, ml_routes, ml_prediction_routes, network_router, incidents, reports, notifications, analytics
-        from backend.app.services.ml_manager import ml_manager
+from database import engine, Base, AsyncSessionLocal
+from models import User, AdminIncident, AuditLog, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, Incident, IncidentAction, UserActivityLog, PcapSession, PcapPacket, EnterpriseThreatRecord, CriticalAlert, CriticalAlertAction
+from auth import hash_password
+from routers import telemetry, auth_routes, dashboard, analyst, ml_routes, ml_prediction_routes, network_router, incidents, reports, notifications, analytics
+from services.ml_manager import ml_manager
 from sqlalchemy import text
 from sqlalchemy.future import select
 
