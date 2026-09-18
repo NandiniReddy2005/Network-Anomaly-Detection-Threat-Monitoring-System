@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pydantic import BaseModel
+from pydantic import BaseModel
+from typing import Optional
 import os
 import logging
 import requests
