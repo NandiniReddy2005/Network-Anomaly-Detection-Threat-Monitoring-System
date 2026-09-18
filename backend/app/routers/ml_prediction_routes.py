@@ -7,17 +7,8 @@ import pandas as pd
 import math
 import logging
 
-try:
-    from database import get_db
-    from services.ml_prediction_service import ml_prediction_service
-except ImportError:
-    try:
-        from app.database import get_db
-        from app.services.ml_prediction_service import ml_prediction_service
-    except ImportError:
-        from backend.app.database import get_db
-        from backend.app.services.ml_prediction_service import ml_prediction_service
-
+from database import get_db
+from services.ml_prediction_service import ml_prediction_service
 logger = logging.getLogger("netshield_ml_routes")
 
 router = APIRouter(prefix="/api/ml", tags=["ML Predictions & Reports"])
