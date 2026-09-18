@@ -11,6 +11,14 @@ import time
 logger = logging.getLogger("netshield_backend")
 
 try:
+    from database import get_db
+    from services.audit import log_audit_event
+    from models import TrafficMetric, SecurityLog
+    from services.safe_sniffer import safe_sniffer
+    from services.threat_intelligence import threat_service
+    from services.ml_prediction_service import ml_prediction_service
+    from services.ml_manager import ml_manager
+except ImportError:
     from app.database import get_db
     from app.services.audit import log_audit_event
     from app.models import TrafficMetric, SecurityLog
@@ -18,14 +26,6 @@ try:
     from app.services.threat_intelligence import threat_service
     from app.services.ml_prediction_service import ml_prediction_service
     from app.services.ml_manager import ml_manager
-except ImportError:
-    from backend.app.database import get_db
-    from backend.app.services.audit import log_audit_event
-    from backend.app.models import TrafficMetric, SecurityLog
-    from backend.app.services.safe_sniffer import safe_sniffer
-    from backend.app.services.threat_intelligence import threat_service
-    from backend.app.services.ml_prediction_service import ml_prediction_service
-    from backend.app.services.ml_manager import ml_manager
 
 router = APIRouter(prefix="/api/network", tags=["Network Monitoring"])
 
