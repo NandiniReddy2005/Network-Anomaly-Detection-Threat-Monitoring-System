@@ -5,11 +5,11 @@ import logging
 import asyncio
 
 try:
+    from database import AsyncSessionLocal
+    from services.audit import log_audit_event
+except ImportError:
     from app.database import AsyncSessionLocal
     from app.services.audit import log_audit_event
-except ImportError:
-    from backend.app.database import AsyncSessionLocal
-    from backend.app.services.audit import log_audit_event
 
 logger = logging.getLogger("netshield_audit_middleware")
 
