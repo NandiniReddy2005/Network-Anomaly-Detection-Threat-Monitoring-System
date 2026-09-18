@@ -21,7 +21,7 @@ from sqlalchemy.future import select
 try:
     from middleware.audit_middleware import AuditLoggingMiddleware
 except ImportError:
-    from app.middleware.audit_middleware import AuditLoggingMiddleware
+    from backend.app.middleware.audit_middleware import AuditLoggingMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
