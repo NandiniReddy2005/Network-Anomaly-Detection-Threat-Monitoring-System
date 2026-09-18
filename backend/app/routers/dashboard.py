@@ -11,13 +11,18 @@ import ipaddress
 logger = logging.getLogger("netshield_backend")
 
 try:
-    from app.database import get_db
-    from app.models import AdminIncident, AuditLog, User, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, EnterpriseThreatRecord, CriticalAlert, CriticalAlertAction, AnalystActivityLog
-    from app.services.audit import log_audit_event
+    from database import get_db
+    from models import AdminIncident, AuditLog, User, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, EnterpriseThreatRecord, CriticalAlert
+    from services.audit import log_audit_event
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import AdminIncident, AuditLog, User, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, EnterpriseThreatRecord, CriticalAlert, CriticalAlertAction, AnalystActivityLog
-    from backend.app.services.audit import log_audit_event
+    try:
+        from app.database import get_db
+        from app.models import AdminIncident, AuditLog, User, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, EnterpriseThreatRecord, CriticalAlert
+        from app.services.audit import log_audit_event
+    except ImportError:
+        from backend.app.database import get_db
+        from backend.app.models import AdminIncident, AuditLog, User, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, EnterpriseThreatRecord, CriticalAlert
+        from backend.app.services.audit import log_audit_event
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 reports_router = APIRouter(prefix="/api/reports", tags=["Reports"])
