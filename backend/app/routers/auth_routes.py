@@ -8,22 +8,10 @@ import logging
 
 logger = logging.getLogger("netshield_auth")
 
-try:
-    from database import get_db
-    from models import User
-    from auth import hash_password, verify_password
-    from services.audit import log_audit_event
-except ImportError:
-    try:
-        from app.database import get_db
-        from app.models import User
-        from app.auth import hash_password, verify_password
-        from app.services.audit import log_audit_event
-    except ImportError:
-        from backend.app.database import get_db
-        from backend.app.models import User
-        from backend.app.auth import hash_password, verify_password
-        from backend.app.services.audit import log_audit_event
+from ..database import get_db
+from ..models import User
+from ..auth import hash_password, verify_password
+from ..services.audit import log_audit_event
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
