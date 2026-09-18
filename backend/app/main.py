@@ -13,7 +13,7 @@ logger = logging.getLogger("netshield_backend")
 from database import engine, Base, AsyncSessionLocal
 from models import User, AdminIncident, AuditLog, TrafficMetric, TrustedDevice, SecurityLog, SystemSetting, Incident, IncidentAction, UserActivityLog, PcapSession, PcapPacket, EnterpriseThreatRecord, CriticalAlert, CriticalAlertAction
 from auth import hash_password
-from routers import telemetry, auth_routes, dashboard, analyst, ml_routes, ml_prediction_routes, network_router, incidents, reports, notifications, analytics, workflow, analyst_activity, monitoring, pcap_router
+from routers import telemetry, auth_routes, dashboard, analyst, ml_routes, ml_prediction_routes, network_router, incidents, reports, notifications, analytics, workflow, analyst_activity, monitoring, pcap_router, traffic_router
 from services.ml_manager import ml_manager
 from sqlalchemy import text
 from sqlalchemy.future import select
