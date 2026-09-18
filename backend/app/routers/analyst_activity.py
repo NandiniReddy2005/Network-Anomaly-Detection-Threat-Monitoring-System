@@ -9,17 +9,24 @@ import logging
 from datetime import datetime, timezone
 
 try:
-    from app.database import get_db
-    from app.models import AnalystActivityLog, User
-    from app.services.audit import log_audit_event
-    from app.services.ml_prediction_service import ml_prediction_service
-    from app.services.threat_intelligence import threat_intel_service
+    from database import get_db
+    from models import AnalystActivityLog, User
+    from services.audit import log_audit_event
+    from services.ml_prediction_service import ml_prediction_service
+    from services.threat_intelligence import threat_intel_service
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import AnalystActivityLog, User
-    from backend.app.services.audit import log_audit_event
-    from backend.app.services.ml_prediction_service import ml_prediction_service
-    from backend.app.services.threat_intelligence import threat_intel_service
+    try:
+        from app.database import get_db
+        from app.models import AnalystActivityLog, User
+        from app.services.audit import log_audit_event
+        from app.services.ml_prediction_service import ml_prediction_service
+        from app.services.threat_intelligence import threat_intel_service
+    except ImportError:
+        from backend.app.database import get_db
+        from backend.app.models import AnalystActivityLog, User
+        from backend.app.services.audit import log_audit_event
+        from backend.app.services.ml_prediction_service import ml_prediction_service
+        from backend.app.services.threat_intelligence import threat_intel_service
 
 logger = logging.getLogger("netshield_analyst_activity")
 
