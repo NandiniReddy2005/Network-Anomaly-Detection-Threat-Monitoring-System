@@ -4,11 +4,15 @@ import logging
 from typing import Optional
 
 try:
-    from app.database import get_db
-    from app.services.ml_manager import ml_manager
+    from database import get_db
+    from services.ml_manager import ml_manager
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.services.ml_manager import ml_manager
+    try:
+        from app.database import get_db
+        from app.services.ml_manager import ml_manager
+    except ImportError:
+        from backend.app.database import get_db
+        from backend.app.services.ml_manager import ml_manager
 
 router = APIRouter(prefix="/api/ml", tags=["Machine Learning"])
 
