@@ -9,13 +9,13 @@ import datetime
 import logging
 
 try:
+    from database import get_db
+    from models import AuditLog, UserActivityLog, Incident, CriticalAlert, CriticalAlertAction
+    from core.state import INCIDENT_QUEUE
+except ImportError:
     from app.database import get_db
     from app.models import AuditLog, UserActivityLog, Incident, CriticalAlert, CriticalAlertAction
     from app.core.state import INCIDENT_QUEUE
-except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import AuditLog, UserActivityLog, Incident, CriticalAlert, CriticalAlertAction
-    from backend.app.core.state import INCIDENT_QUEUE
 
 logger = logging.getLogger("netshield_reports")
 
