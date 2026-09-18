@@ -6,10 +6,7 @@ from typing import Optional, Dict, Any
 try:
     from services.threat_intelligence import threat_service
 except ImportError:
-    try:
-        from app.services.threat_intelligence import threat_service
-    except ImportError:
-        from backend.app.services.threat_intelligence import threat_service
+    from app.services.threat_intelligence import threat_service
 
 logger = logging.getLogger("netshield_sniffer")
 
