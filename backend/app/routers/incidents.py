@@ -13,6 +13,14 @@ import logging
 import asyncio
 
 try:
+    from database import get_db
+    from models import Incident, IncidentAction, User, SecurityLog, UserActivityLog
+    from services.audit import log_audit_event
+    from services.threat_intelligence import threat_service
+    from services.ml_prediction_service import ml_prediction_service
+    from services.ml_manager import ml_manager
+    from core.state import INCIDENT_QUEUE, NOTIFICATION_STORE, sync_notification_status
+except ImportError:
     from app.database import get_db
     from app.models import Incident, IncidentAction, User, SecurityLog, UserActivityLog
     from app.services.audit import log_audit_event
@@ -20,14 +28,6 @@ try:
     from app.services.ml_prediction_service import ml_prediction_service
     from app.services.ml_manager import ml_manager
     from app.core.state import INCIDENT_QUEUE, NOTIFICATION_STORE, sync_notification_status
-except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import Incident, IncidentAction, User, SecurityLog, UserActivityLog
-    from backend.app.services.audit import log_audit_event
-    from backend.app.services.threat_intelligence import threat_service
-    from backend.app.services.ml_prediction_service import ml_prediction_service
-    from backend.app.services.ml_manager import ml_manager
-    from backend.app.core.state import INCIDENT_QUEUE, NOTIFICATION_STORE, sync_notification_status
 
 logger = logging.getLogger("netshield_incidents")
 
