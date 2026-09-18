@@ -6,15 +6,15 @@ import datetime
 import logging
 
 try:
+    from database import get_db
+    from models import AuditLog
+    from services.audit import log_audit_event
+    from core.state import INCIDENT_QUEUE, NOTIFICATION_STORE, sync_notification_status
+except ImportError:
     from app.database import get_db
     from app.models import AuditLog
     from app.services.audit import log_audit_event
     from app.core.state import INCIDENT_QUEUE, NOTIFICATION_STORE, sync_notification_status
-except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import AuditLog
-    from backend.app.services.audit import log_audit_event
-    from backend.app.core.state import INCIDENT_QUEUE, NOTIFICATION_STORE, sync_notification_status
 
 logger = logging.getLogger("netshield_workflow")
 
