@@ -7,11 +7,15 @@ import math
 from typing import Optional
 
 try:
-    from app.database import get_db
-    from app.models import TrafficMetric, SecurityLog, TrustedDevice
+    from database import get_db
+    from models import TrafficMetric, SecurityLog, TrustedDevice
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import TrafficMetric, SecurityLog, TrustedDevice
+    try:
+        from app.database import get_db
+        from app.models import TrafficMetric, SecurityLog, TrustedDevice
+    except ImportError:
+        from backend.app.database import get_db
+        from backend.app.models import TrafficMetric, SecurityLog, TrustedDevice
 
 router = APIRouter(prefix="/api/analyst", tags=["Security Analyst"])
 
