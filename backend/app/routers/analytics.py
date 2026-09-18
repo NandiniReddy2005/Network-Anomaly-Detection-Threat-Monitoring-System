@@ -7,15 +7,15 @@ import logging
 import datetime
 
 try:
+    from database import get_db
+    from models import AdminIncident, AuditLog, Incident
+    from core.state import INCIDENT_QUEUE
+    from routers.incidents import fetch_incidents_with_action_history
+except ImportError:
     from app.database import get_db
     from app.models import AdminIncident, AuditLog, Incident
     from app.core.state import INCIDENT_QUEUE
     from app.routers.incidents import fetch_incidents_with_action_history
-except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import AdminIncident, AuditLog, Incident
-    from backend.app.core.state import INCIDENT_QUEUE
-    from backend.app.routers.incidents import fetch_incidents_with_action_history
 
 logger = logging.getLogger("netshield_analytics")
 
