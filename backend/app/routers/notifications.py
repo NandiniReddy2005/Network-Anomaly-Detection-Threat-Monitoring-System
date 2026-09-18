@@ -7,10 +7,10 @@ import datetime
 import logging
 
 try:
-    from app.database import get_db
-    from app.models import Incident, CapturedPacket
-    from app.services.audit import log_audit_event
-    from app.core.state import (
+    from database import get_db
+    from models import Incident, CapturedPacket
+    from services.audit import log_audit_event
+    from core.state import (
         INCIDENT_QUEUE,
         NOTIFICATION_STORE,
         ANALYST_NOTIFICATION_STORE,
@@ -18,10 +18,10 @@ try:
         sync_notification_status,
     )
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import Incident, CapturedPacket
-    from backend.app.services.audit import log_audit_event
-    from backend.app.core.state import (
+    from app.database import get_db
+    from app.models import Incident, CapturedPacket
+    from app.services.audit import log_audit_event
+    from app.core.state import (
         INCIDENT_QUEUE,
         NOTIFICATION_STORE,
         ANALYST_NOTIFICATION_STORE,
