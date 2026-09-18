@@ -4,9 +4,12 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
-    from app.models import AuditLog, User
+    from models import AuditLog, User
 except ImportError:
-    from backend.app.models import AuditLog, User
+    try:
+        from app.models import AuditLog, User
+    except ImportError:
+        from backend.app.models import AuditLog, User
 from sqlalchemy.future import select
 
 logger = logging.getLogger("netshield_audit")
