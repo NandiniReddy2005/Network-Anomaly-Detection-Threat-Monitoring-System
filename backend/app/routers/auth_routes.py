@@ -8,10 +8,10 @@ import logging
 
 logger = logging.getLogger("netshield_auth")
 
-from ..database import get_db
-from ..models import User
-from ..auth import hash_password, verify_password
-from ..services.audit import log_audit_event
+from database import get_db
+from models import User
+from auth import hash_password, verify_password
+from services.audit import log_audit_event
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
