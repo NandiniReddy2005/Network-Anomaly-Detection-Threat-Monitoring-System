@@ -4,9 +4,12 @@ import logging
 from typing import Dict, Any, List, Optional, Union
 
 try:
-    from app.services.ml_manager import ml_manager
+    from services.ml_manager import ml_manager
 except ImportError:
-    from backend.app.services.ml_manager import ml_manager
+    try:
+        from app.services.ml_manager import ml_manager
+    except ImportError:
+        from backend.app.services.ml_manager import ml_manager
 
 logger = logging.getLogger("netshield_ml_prediction")
 
