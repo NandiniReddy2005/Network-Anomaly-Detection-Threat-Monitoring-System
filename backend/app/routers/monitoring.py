@@ -14,14 +14,18 @@ except ImportError:
     psutil = None
 
 try:
-    from app.database import get_db
-    from app.models import TrafficMetric, SecurityLog, AnalystActivityLog
-    from app.services.audit import log_audit_event
+    from database import get_db
+    from models import TrafficMetric, SecurityLog, AnalystActivityLog
+    from services.audit import log_audit_event
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import TrafficMetric, SecurityLog, AnalystActivityLog
-    from backend.app.services.audit import log_audit_event
-
+    try:
+        from app.database import get_db
+        from app.models import TrafficMetric, SecurityLog, AnalystActivityLog
+        from app.services.audit import log_audit_event
+    except ImportError:
+        from backend.app.database import get_db
+        from backend.app.models import TrafficMetric, SecurityLog, AnalystActivityLog
+        from backend.app.services.audit import log_audit_event
 logger = logging.getLogger("netshield_monitoring")
 
 router = APIRouter(prefix="/api/monitoring", tags=["Real-Time Automated Network Monitoring"])
