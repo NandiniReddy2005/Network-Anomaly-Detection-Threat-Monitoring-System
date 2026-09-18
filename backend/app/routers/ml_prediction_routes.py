@@ -8,15 +8,15 @@ import math
 import logging
 
 try:
-    from app.database import get_db
-    from app.services.ml_manager import ml_manager
-    from app.services.ml_prediction_service import ml_prediction_service
-    from app.services.audit import log_audit_event
+    from database import get_db
+    from services.ml_prediction_service import ml_prediction_service
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.services.ml_manager import ml_manager
-    from backend.app.services.ml_prediction_service import ml_prediction_service
-    from backend.app.services.audit import log_audit_event
+    try:
+        from app.database import get_db
+        from app.services.ml_prediction_service import ml_prediction_service
+    except ImportError:
+        from backend.app.database import get_db
+        from backend.app.services.ml_prediction_service import ml_prediction_service
 
 logger = logging.getLogger("netshield_ml_routes")
 
