@@ -13,13 +13,12 @@ import os
 import uuid
 
 try:
-    from app.database import get_db
-    from app.models import PcapSession, PcapPacket, CapturedPacket, Incident, UserActivityLog
-    from app.services.audit import log_audit_event
+    from database import get_db
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import PcapSession, PcapPacket, CapturedPacket, Incident, UserActivityLog
-    from backend.app.services.audit import log_audit_event
+    try:
+        from app.database import get_db
+    except ImportError:
+        from backend.app.database import get_db
 
 logger = logging.getLogger("netshield_pcap")
 
