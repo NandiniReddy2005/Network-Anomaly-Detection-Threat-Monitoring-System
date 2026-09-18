@@ -10,11 +10,12 @@ from datetime import datetime, timezone
 from pydantic import BaseModel
 
 try:
-    from app.database import get_db
-    from app.models import CapturedPacket, UserTrafficAnalysisState
+    from database import get_db
 except ImportError:
-    from backend.app.database import get_db
-    from backend.app.models import CapturedPacket, UserTrafficAnalysisState
+    try:
+        from app.database import get_db
+    except ImportError:
+        from backend.app.database import get_db
 
 router = APIRouter(prefix="/api/traffic-analysis", tags=["Traffic Analysis"])
 
