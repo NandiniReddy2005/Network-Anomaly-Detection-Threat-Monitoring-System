@@ -28,8 +28,10 @@ async def lifespan(app: FastAPI):
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-
+            await conn.commit()  # <-- Add this explicit commit here
+            
             def _migrate_audit_columns(connection):
+                # (keep your existing migration code here)
                 for col_name, col_type in [
                     ("module", "VARCHAR(100)"),
                     ("status", "VARCHAR(50)"),
