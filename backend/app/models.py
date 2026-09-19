@@ -33,7 +33,7 @@ class TrafficMetric(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     packet_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    bytes_transferred: Mapped[int] = mapped_column(Integer, nullable=False)
+    bytes_transferred: Mapped[int] = mapped_column(BigInteger, nullable=False)
     anomaly_score: Mapped[float] = mapped_column(Float, default=0.0)
     recorded_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
