@@ -21,13 +21,14 @@ from sqlalchemy.future import select
 
 from middleware.audit_middleware import AuditLoggingMiddleware
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: create tables if they do not exist
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            
+
             def _migrate_audit_columns(connection):
                 for col_name, col_type in [
                     ("module", "VARCHAR(100)"),
@@ -39,26 +40,38 @@ async def lifespan(app: FastAPI):
                     ("logout_time", "VARCHAR(50)")
                 ]:
                     try:
-                        connection.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {col_name} {col_type}"))
+                        connection.execute(
+                            text(
+                                f"ALTER TABLE audit_logs ADD COLUMN {col_name} {col_type}"
+                            )
+                        )
                     except Exception:
                         pass
+
                 for col_name, col_type in [
                     ("created_by", "VARCHAR(255) DEFAULT 'security@gmail.com'"),
                     ("dataset_engine", "VARCHAR(100) DEFAULT 'UNSW-NB15'")
                 ]:
                     try:
-                        connection.execute(text(f"ALTER TABLE incidents ADD COLUMN {col_name} {col_type}"))
+                        connection.execute(
+                            text(
+                                f"ALTER TABLE incidents ADD COLUMN {col_name} {col_type}"
+                            )
+                        )
                     except Exception:
                         pass
+
             await conn.run_sync(_migrate_audit_columns)
 
         # Seed initial users & incidents if database is empty
         async with AsyncSessionLocal() as session:
             result_users = await session.execute(select(User))
             users = result_users.scalars().all()
+
             if not users:
                 admin_pwd = hash_password("admin123")
                 analyst_pwd = hash_password("analyst123")
+
                 default_users = [
                     User(email="sec_admin@gmail.com", password_hash=admin_pwd, role="admin"),
                     User(email="admin_primary@netshield.ai", password_hash=admin_pwd, role="admin"),
@@ -75,26 +88,47 @@ async def lifespan(app: FastAPI):
                     User(email="tier2_analyst@netshield.io", password_hash=analyst_pwd, role="analyst"),
                     User(email="soc_analyst1@netshield.io", password_hash=analyst_pwd, role="analyst"),
                 ]
+
                 session.add_all(default_users)
                 await session.commit()
 
             result_incidents = await session.execute(select(AdminIncident))
             incidents = result_incidents.scalars().all()
+
             if not incidents:
                 default_incidents = [
-                    AdminIncident(id="INC-901", severity="Critical", type="DDoS Volumetric Spike", analyst="Unassigned", status="Open", updated="2 mins ago"),
-                    AdminIncident(id="INC-902", severity="High", type="ARP Spoofing Attempt", analyst="analyst@gmail.com", status="Investigating", updated="15 mins ago"),
-                    AdminIncident(id="INC-903", severity="Medium", type="Unauthorized Port Scan", analyst="sec_admin@gmail.com", status="Resolved", updated="1 hour ago"),
+                    AdminIncident(
+                        id="INC-901",
+                        severity="Critical",
+                        type="DDoS Volumetric Spike",
+                        analyst="Unassigned",
+                        status="Open",
+                        updated="2 mins ago"
+                    ),
+                    AdminIncident(
+                        id="INC-902",
+                        severity="High",
+                        type="ARP Spoofing Attempt",
+                        analyst="analyst@gmail.com",
+                        status="Investigating",
+                        updated="15 mins ago"
+                    ),
+                    AdminIncident(
+                        id="INC-903",
+                        severity="Medium",
+                        type="Unauthorized Port Scan",
+                        analyst="sec_admin@gmail.com",
+                        status="Resolved",
+                        updated="1 hour ago"
+                    ),
                 ]
+
                 session.add_all(default_incidents)
                 await session.commit()
-    except Exception as e:
-        logger.error(f"Startup database initialization failed: {e}")
-
-    yield
 
             result_logs = await session.execute(select(AuditLog))
             logs = result_logs.scalars().all()
+
             if not logs or len(logs) < 5:
                 default_logs = [
                     AuditLog(
@@ -208,54 +242,107 @@ async def lifespan(app: FastAPI):
                         details="Successful password authentication via Auth Gateway."
                     )
                 ]
+
                 session.add_all(default_logs)
                 await session.commit()
 
             result_metrics = await session.execute(select(TrafficMetric))
             metrics = result_metrics.scalars().all()
+
             if not metrics:
                 default_metrics = [
-                    TrafficMetric(packet_count=84200000, bytes_transferred=51200000000, anomaly_score=12.4),
-                    TrafficMetric(packet_count=1482000, bytes_transferred=1024000000, anomaly_score=5.2)
+                    TrafficMetric(
+                        packet_count=84200000,
+                        bytes_transferred=51200000000,
+                        anomaly_score=12.4
+                    ),
+                    TrafficMetric(
+                        packet_count=1482000,
+                        bytes_transferred=1024000000,
+                        anomaly_score=5.2
+                    )
                 ]
+
                 session.add_all(default_metrics)
                 await session.commit()
 
             result_devices = await session.execute(select(TrustedDevice))
             devices = result_devices.scalars().all()
+
             if not devices:
                 default_devices = [
-                    TrustedDevice(ip_address="192.168.1.50", mac_address="00:1A:2B:3C:4D:5E", device_name="Gateway Firewall", is_blocked=False),
-                    TrustedDevice(ip_address="192.168.1.100", mac_address="00:1A:2B:3C:4D:5F", device_name="Analyst Workstation", is_blocked=False)
+                    TrustedDevice(
+                        ip_address="192.168.1.50",
+                        mac_address="00:1A:2B:3C:4D:5E",
+                        device_name="Gateway Firewall",
+                        is_blocked=False
+                    ),
+                    TrustedDevice(
+                        ip_address="192.168.1.100",
+                        mac_address="00:1A:2B:3C:4D:5F",
+                        device_name="Analyst Workstation",
+                        is_blocked=False
+                    )
                 ]
+
                 session.add_all(default_devices)
                 await session.commit()
 
             result_sec_logs = await session.execute(select(SecurityLog))
             sec_logs = result_sec_logs.scalars().all()
+
             if not sec_logs:
                 default_sec_logs = [
-                    SecurityLog(event_type="ARP_SPOOF", details="Gratuitous ARP flood intercepted on eth0 sensor cluster", severity="HIGH"),
-                    SecurityLog(event_type="DDOS_ANOMALY", details="Volumetric UDP flood anomaly score elevated to 88/100", severity="CRITICAL"),
-                    SecurityLog(event_type="PORT_SCAN", details="Horizontal SYN scan detected from external IP 198.51.100.42", severity="MEDIUM"),
-                    SecurityLog(event_type="AUTH_FAIL", details="Multiple failed authentication attempts for admin role", severity="WARNING"),
+                    SecurityLog(
+                        event_type="ARP_SPOOF",
+                        details="Gratuitous ARP flood intercepted on eth0 sensor cluster",
+                        severity="HIGH"
+                    ),
+                    SecurityLog(
+                        event_type="DDOS_ANOMALY",
+                        details="Volumetric UDP flood anomaly score elevated to 88/100",
+                        severity="CRITICAL"
+                    ),
+                    SecurityLog(
+                        event_type="PORT_SCAN",
+                        details="Horizontal SYN scan detected from external IP 198.51.100.42",
+                        severity="MEDIUM"
+                    ),
+                    SecurityLog(
+                        event_type="AUTH_FAIL",
+                        details="Multiple failed authentication attempts for admin role",
+                        severity="WARNING"
+                    ),
                 ]
+
                 session.add_all(default_sec_logs)
                 await session.commit()
 
             result_settings = await session.execute(select(SystemSetting))
             settings = result_settings.scalars().all()
+
             if not settings:
                 default_settings = [
-                    SystemSetting(key="telemetry_polling_interval", value="Standard (5 seconds)"),
-                    SystemSetting(key="threat_threshold", value="High Severity"),
-                    SystemSetting(key="auto_mitigation", value="Enabled"),
+                    SystemSetting(
+                        key="telemetry_polling_interval",
+                        value="Standard (5 seconds)"
+                    ),
+                    SystemSetting(
+                        key="threat_threshold",
+                        value="High Severity"
+                    ),
+                    SystemSetting(
+                        key="auto_mitigation",
+                        value="Enabled"
+                    )
                 ]
+
                 session.add_all(default_settings)
                 await session.commit()
 
             result_user_act = await session.execute(select(UserActivityLog))
             user_act = result_user_act.scalars().all()
+
             if not user_act:
                 default_user_act = [
                     UserActivityLog(
@@ -295,11 +382,15 @@ async def lifespan(app: FastAPI):
                         severity="HIGH"
                     ),
                 ]
+
                 session.add_all(default_user_act)
                 await session.commit()
 
-            result_ent_threats = await session.execute(select(EnterpriseThreatRecord))
+            result_ent_threats = await session.execute(
+                select(EnterpriseThreatRecord)
+            )
             ent_threats = result_ent_threats.scalars().all()
+
             if not ent_threats:
                 default_ent_threats = [
                     EnterpriseThreatRecord(
@@ -387,11 +478,13 @@ async def lifespan(app: FastAPI):
                         threat_score=15.0
                     )
                 ]
+
                 session.add_all(default_ent_threats)
                 await session.commit()
 
             result_crit_alerts = await session.execute(select(CriticalAlert))
             crit_alerts = result_crit_alerts.scalars().all()
+
             if not crit_alerts:
                 default_crit_alerts = [
                     CriticalAlert(
@@ -495,10 +588,12 @@ async def lifespan(app: FastAPI):
                         analyst="SOC Emergency Escalation Team"
                     )
                 ]
+
                 session.add_all(default_crit_alerts)
                 await session.commit()
 
             logger.info("PostgreSQL Database initialized and seeded successfully.")
+
     except Exception as e:
         logger.warning(f"Database initialization warning: {e}")
 
@@ -510,13 +605,19 @@ async def lifespan(app: FastAPI):
         logger.error(f"Error loading ML artifacts: {e}")
 
     yield
+
     # Shutdown: Dispose engine connection pool cleanly
     try:
         await engine.dispose()
     except Exception:
         pass
 
-app = FastAPI(title="NetShield-AI Backend", version="1.0.0", lifespan=lifespan)
+
+app = FastAPI(
+    title="NetShield-AI Backend",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 # Enable CORS for Next.js Frontend communication
 app.add_middleware(
@@ -562,6 +663,7 @@ app.include_router(monitoring.router)
 app.include_router(pcap_router.router)
 app.include_router(traffic_router.router)
 
+
 class TrafficQuery(BaseModel):
     source_ip: Optional[str] = None
     destination_ip: Optional[str] = None
@@ -572,34 +674,79 @@ class TrafficQuery(BaseModel):
     flow_duration: float = 0.0
     syn_flag_count: int = 0
 
+
 unsw_df = None
 cicids_df = None
-KNOWN_ATTACKER_IPS = {"185.220.101.7", "205.174.165.73", "185.220.101.42", "185.220.101.50", "89.67.55.34"}
+
+KNOWN_ATTACKER_IPS = {
+    "185.220.101.7",
+    "205.174.165.73",
+    "185.220.101.42",
+    "185.220.101.50",
+    "89.67.55.34"
+}
+
 
 def _is_private_ip(ip: Optional[str]) -> bool:
     if not ip or not isinstance(ip, str):
         return True
+
     clean = ip.strip()
+
     return (
         clean.startswith("10.") or
         clean.startswith("192.168.") or
-        clean.startswith("172.16.") or clean.startswith("172.17.") or clean.startswith("172.18.") or clean.startswith("172.19.") or
-        clean.startswith("172.20.") or clean.startswith("172.21.") or clean.startswith("172.22.") or clean.startswith("172.23.") or
-        clean.startswith("172.24.") or clean.startswith("172.25.") or clean.startswith("172.26.") or clean.startswith("172.27.") or
-        clean.startswith("172.28.") or clean.startswith("172.29.") or clean.startswith("172.30.") or clean.startswith("172.31.") or
-        clean.startswith("127.") or clean == "::1" or clean == "localhost"
+        clean.startswith("172.16.") or
+        clean.startswith("172.17.") or
+        clean.startswith("172.18.") or
+        clean.startswith("172.19.") or
+        clean.startswith("172.20.") or
+        clean.startswith("172.21.") or
+        clean.startswith("172.22.") or
+        clean.startswith("172.23.") or
+        clean.startswith("172.24.") or
+        clean.startswith("172.25.") or
+        clean.startswith("172.26.") or
+        clean.startswith("172.27.") or
+        clean.startswith("172.28.") or
+        clean.startswith("172.29.") or
+        clean.startswith("172.30.") or
+        clean.startswith("172.31.") or
+        clean.startswith("127.") or
+        clean == "::1" or
+        clean == "localhost"
     )
 
+
 def _is_whitelisted_ip(ip: Optional[str]) -> bool:
-    safe_list = {"8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1", "9.9.9.9", "208.67.222.222", "142.250.190.46"}
+    safe_list = {
+        "8.8.8.8",
+        "8.8.4.4",
+        "1.1.1.1",
+        "1.0.0.1",
+        "9.9.9.9",
+        "208.67.222.222",
+        "142.250.190.46"
+    }
+
     return bool(ip and ip.strip() in safe_list)
 
-def _eval_npcap_telemetry_source(src_ip: str, dst_ip: str, proto: str, syn_flags: int, duration: float, length_mean: float) -> tuple[int, dict]:
+
+def _eval_npcap_telemetry_source(
+    src_ip: str,
+    dst_ip: str,
+    proto: str,
+    syn_flags: int,
+    duration: float,
+    length_mean: float
+) -> tuple[int, dict]:
     """1. Npcap / Live Packet Stream Ingestion & Telemetry Analysis"""
+
     proto_upper = (proto or "TCP").upper()
     is_dst_public = not _is_private_ip(dst_ip)
-    
+
     packet_count = 1420
+
     if proto_upper in ["HTTPS", "SSL", "TLS"]:
         packet_count = 1850
     elif proto_upper == "ICMP":
@@ -607,7 +754,11 @@ def _eval_npcap_telemetry_source(src_ip: str, dst_ip: str, proto: str, syn_flags
     elif proto_upper == "UDP":
         packet_count = 1200
 
-    if syn_flags > 5 or duration > 1000.0 or (proto_upper == "ICMP" and is_dst_public):
+    if (
+        syn_flags > 5
+        or duration > 1000.0
+        or (proto_upper == "ICMP" and is_dst_public)
+    ):
         telemetry_score = 85
     elif proto_upper in ["ICMP", "UDP"] and not _is_private_ip(src_ip):
         telemetry_score = 65
@@ -616,135 +767,373 @@ def _eval_npcap_telemetry_source(src_ip: str, dst_ip: str, proto: str, syn_flags
     else:
         telemetry_score = 20
 
-    bandwidth_mbps = round((packet_count * 1200 * 8) / 1_000_000, 1)
+    bandwidth_mbps = round(
+        (packet_count * 1200 * 8) / 1_000_000,
+        1
+    )
+
     return telemetry_score, {
         "packets_formatted": f"{packet_count:,} Packets",
         "bandwidth_formatted": f"{bandwidth_mbps} Mbps",
         "telemetry_score": telemetry_score
     }
 
-def _eval_abuseipdb_threat_source(target_ip: str) -> tuple[Optional[int], dict]:
+
+def _eval_abuseipdb_threat_source(
+    target_ip: str
+) -> tuple[Optional[int], dict]:
     """2. AbuseIPDB Real-Time API External Threat Intelligence"""
-    if not target_ip or _is_private_ip(target_ip) or _is_whitelisted_ip(target_ip):
-        return 0, {"score": 0, "status": "Clean / Whitelisted"}
+
+    if (
+        not target_ip
+        or _is_private_ip(target_ip)
+        or _is_whitelisted_ip(target_ip)
+    ):
+        return 0, {
+            "score": 0,
+            "status": "Clean / Whitelisted"
+        }
 
     try:
         url = "https://api.abuseipdb.com/api/v2/check"
-        querystring = {"ipAddress": target_ip, "maxAgeInDays": "90", "verbose": "true"}
-        abuse_key = getattr(settings, "ABUSEIPDB_API_KEY", None) or os.getenv("ABUSEIPDB_API_KEY", "")
-        
+
+        querystring = {
+            "ipAddress": target_ip,
+            "maxAgeInDays": "90",
+            "verbose": "true"
+        }
+
+        abuse_key = getattr(
+            settings,
+            "ABUSEIPDB_API_KEY",
+            None
+        ) or os.getenv(
+            "ABUSEIPDB_API_KEY",
+            ""
+        )
+
         if abuse_key and abuse_key.strip():
-            headers = {"Key": abuse_key.strip(), "Accept": "application/json"}
-            print(f"[AbuseIPDB Backend Route] Querying live external AbuseIPDB API for target IP '{target_ip}' with Key '{abuse_key[:8]}...'")
-            
-            response = requests.get(url, headers=headers, params=querystring, timeout=3.5)
-            print(f"[AbuseIPDB Backend Route Response] HTTP Status {response.status_code} for {target_ip}")
-            
+            headers = {
+                "Key": abuse_key.strip(),
+                "Accept": "application/json"
+            }
+
+            print(
+                f"[AbuseIPDB Backend Route] Querying live external "
+                f"AbuseIPDB API for target IP '{target_ip}' "
+                f"with Key '{abuse_key[:8]}...'"
+            )
+
+            response = requests.get(
+                url,
+                headers=headers,
+                params=querystring,
+                timeout=3.5
+            )
+
+            print(
+                f"[AbuseIPDB Backend Route Response] "
+                f"HTTP Status {response.status_code} for {target_ip}"
+            )
+
             if response.status_code == 200:
                 payload = response.json()
-                print(f"[AbuseIPDB Raw Payload] {target_ip} -> {payload}")
+
+                print(
+                    f"[AbuseIPDB Raw Payload] "
+                    f"{target_ip} -> {payload}"
+                )
+
                 data = payload.get("data", {})
-                score = data.get("abuseConfidenceScore", 0)
-                
-                # If API returns 0 for an external public IP, apply dynamic public reputation calculation
+                score = data.get(
+                    "abuseConfidenceScore",
+                    0
+                )
+
+                # If API returns 0 for an external public IP,
+                # apply dynamic public reputation calculation
                 if score == 0 and not _is_private_ip(target_ip):
-                    octets = [int(p) for p in target_ip.strip().split(".") if p.isdigit()]
+                    octets = [
+                        int(p)
+                        for p in target_ip.strip().split(".")
+                        if p.isdigit()
+                    ]
+
                     if len(octets) == 4:
-                        checksum = octets[0] * 7 + octets[1] * 13 + octets[2] * 19 + octets[3] * 31
+                        checksum = (
+                            octets[0] * 7
+                            + octets[1] * 13
+                            + octets[2] * 19
+                            + octets[3] * 31
+                        )
+
                         score = (checksum % 54) + 35
-                
-                print(f"[AbuseIPDB Backend Route Success] Parsed abuseConfidenceScore: {score}% for {target_ip}")
-                return score, {"score": score, "status": "Live API Success", "data": data}
+
+                print(
+                    f"[AbuseIPDB Backend Route Success] "
+                    f"Parsed abuseConfidenceScore: {score}% "
+                    f"for {target_ip}"
+                )
+
+                return score, {
+                    "score": score,
+                    "status": "Live API Success",
+                    "data": data
+                }
+
             else:
-                print(f"[AbuseIPDB Backend Route Error] HTTP {response.status_code} from AbuseIPDB for {target_ip}: {response.text[:250]}")
+                print(
+                    f"[AbuseIPDB Backend Route Error] "
+                    f"HTTP {response.status_code} from AbuseIPDB "
+                    f"for {target_ip}: {response.text[:250]}"
+                )
+
         else:
-            print(f"[AbuseIPDB Backend Route Warning] ABUSEIPDB_API_KEY environment variable is unconfigured for {target_ip}")
+            print(
+                f"[AbuseIPDB Backend Route Warning] "
+                f"ABUSEIPDB_API_KEY environment variable is "
+                f"unconfigured for {target_ip}"
+            )
 
     except Exception as e:
-        print(f"[AbuseIPDB Backend Route Exception] Network/Fetch Error for {target_ip}: {e}")
+        print(
+            f"[AbuseIPDB Backend Route Exception] "
+            f"Network/Fetch Error for {target_ip}: {e}"
+        )
 
     # Dynamic live threat evaluation for public IP addresses
     try:
-        octets = [int(p) for p in target_ip.strip().split(".") if p.isdigit()]
+        octets = [
+            int(p)
+            for p in target_ip.strip().split(".")
+            if p.isdigit()
+        ]
+
         if len(octets) == 4:
-            checksum = octets[0] * 7 + octets[1] * 13 + octets[2] * 19 + octets[3] * 31
+            checksum = (
+                octets[0] * 7
+                + octets[1] * 13
+                + octets[2] * 19
+                + octets[3] * 31
+            )
+
             score = (checksum % 54) + 35
-            print(f"[AbuseIPDB Backend Route Dynamic] Evaluated reputation score: {score}% for {target_ip}")
-            return score, {"score": score, "status": "Dynamic Public Reputation"}
+
+            print(
+                f"[AbuseIPDB Backend Route Dynamic] "
+                f"Evaluated reputation score: {score}% "
+                f"for {target_ip}"
+            )
+
+            return score, {
+                "score": score,
+                "status": "Dynamic Public Reputation"
+            }
+
     except Exception:
         pass
 
-    return 45, {"score": 45, "status": "Default Public"}
+    return 45, {
+        "score": 45,
+        "status": "Default Public"
+    }
 
-def _eval_unsw_dataset_source(src_ip: str, dst_ip: str, proto: str, duration: float, syn_flags: int, length_mean: float) -> tuple[int, str]:
+
+def _eval_unsw_dataset_source(
+    src_ip: str,
+    dst_ip: str,
+    proto: str,
+    duration: float,
+    syn_flags: int,
+    length_mean: float
+) -> tuple[int, str]:
     """3. UNSW-NB15 Academic Dataset & ML Classifier Evaluation"""
+
     if unsw_df is not None and "srcip" in unsw_df.columns:
-        matched = unsw_df[(unsw_df["srcip"] == src_ip) | (unsw_df["srcip"] == dst_ip)]
+        matched = unsw_df[
+            (unsw_df["srcip"] == src_ip)
+            | (unsw_df["srcip"] == dst_ip)
+        ]
+
         if not matched.empty:
-            label_val = int(matched.iloc[0].get("label", 0))
-            threat_cat = str(matched.iloc[0].get("attack_cat", "Normal"))
-            score = 96 if (label_val == 1 or syn_flags > 5) else int(label_val * 85)
+            label_val = int(
+                matched.iloc[0].get("label", 0)
+            )
+
+            threat_cat = str(
+                matched.iloc[0].get(
+                    "attack_cat",
+                    "Normal"
+                )
+            )
+
+            score = (
+                96
+                if (label_val == 1 or syn_flags > 5)
+                else int(label_val * 85)
+            )
+
             return score, threat_cat
-    
+
     try:
         from app.services.ml_prediction_service import ml_prediction_service
-        res = ml_prediction_service.predict_threat("UNSW_NB15", {
-            "srcip": src_ip,
-            "dstip": dst_ip,
-            "proto": proto,
-            "dur": duration,
-            "spkts": float(syn_flags if syn_flags > 0 else 10.0),
-            "sbytes": length_mean * 10.0 if length_mean > 0 else 1420.0
-        })
+
+        res = ml_prediction_service.predict_threat(
+            "UNSW_NB15",
+            {
+                "srcip": src_ip,
+                "dstip": dst_ip,
+                "proto": proto,
+                "dur": duration,
+                "spkts": float(
+                    syn_flags
+                    if syn_flags > 0
+                    else 10.0
+                ),
+                "sbytes": (
+                    length_mean * 10.0
+                    if length_mean > 0
+                    else 1420.0
+                )
+            }
+        )
+
         if res and "risk_score" in res:
-            return int(res["risk_score"]), str(res.get("predicted_threat", "Normal"))
+            return (
+                int(res["risk_score"]),
+                str(
+                    res.get(
+                        "predicted_threat",
+                        "Normal"
+                    )
+                )
+            )
+
     except Exception as ml_e:
-        logger.warning(f"UNSW prediction notice: {ml_e}")
+        logger.warning(
+            f"UNSW prediction notice: {ml_e}"
+        )
 
-    return (96 if syn_flags > 5 else 10), "Normal"
+    return (
+        96 if syn_flags > 5 else 10,
+        "Normal"
+    )
 
-def _eval_cicids_dataset_source(src_ip: str, dst_ip: str, proto: str, duration: float, syn_flags: int, length_mean: float) -> tuple[int, str]:
+
+def _eval_cicids_dataset_source(
+    src_ip: str,
+    dst_ip: str,
+    proto: str,
+    duration: float,
+    syn_flags: int,
+    length_mean: float
+) -> tuple[int, str]:
     """4. CICIDS2017 Academic Dataset & ML Anomaly Detection Evaluation"""
-    if cicids_df is not None and ("Source IP" in cicids_df.columns or "srcip" in cicids_df.columns):
-        col = "Source IP" if "Source IP" in cicids_df.columns else "srcip"
-        matched = cicids_df[(cicids_df[col] == src_ip) | (cicids_df[col] == dst_ip)]
+
+    if (
+        cicids_df is not None
+        and (
+            "Source IP" in cicids_df.columns
+            or "srcip" in cicids_df.columns
+        )
+    ):
+        col = (
+            "Source IP"
+            if "Source IP" in cicids_df.columns
+            else "srcip"
+        )
+
+        matched = cicids_df[
+            (cicids_df[col] == src_ip)
+            | (cicids_df[col] == dst_ip)
+        ]
+
         if not matched.empty:
-            label_val = str(matched.iloc[0].get("Label", matched.iloc[0].get("label", "BENIGN")))
-            score = 15 if label_val.upper() == "BENIGN" else 92
+            label_val = str(
+                matched.iloc[0].get(
+                    "Label",
+                    matched.iloc[0].get(
+                        "label",
+                        "BENIGN"
+                    )
+                )
+            )
+
+            score = (
+                15
+                if label_val.upper() == "BENIGN"
+                else 92
+            )
+
             return score, label_val
 
     try:
         from app.services.ml_prediction_service import ml_prediction_service
-        res = ml_prediction_service.predict_anomaly("CICIDS2017", {
-            "srcip": src_ip,
-            "dstip": dst_ip,
-            "proto": proto,
-            "dur": duration,
-            "spkts": float(syn_flags),
-            "sbytes": length_mean * 10.0
-        })
-        if res and "anomaly_score" in res:
-            return int(res["anomaly_score"]), str(res.get("anomaly_label", "Normal"))
-    except Exception as ml_e:
-        try:
-            from app.services.ml_prediction_service import ml_prediction_service
-            res = ml_prediction_service.predict_threat("CICIDS2017", {
+
+        res = ml_prediction_service.predict_anomaly(
+            "CICIDS2017",
+            {
                 "srcip": src_ip,
                 "dstip": dst_ip,
                 "proto": proto,
                 "dur": duration,
                 "spkts": float(syn_flags),
                 "sbytes": length_mean * 10.0
-            })
+            }
+        )
+
+        if res and "anomaly_score" in res:
+            return (
+                int(res["anomaly_score"]),
+                str(
+                    res.get(
+                        "anomaly_label",
+                        "Normal"
+                    )
+                )
+            )
+
+    except Exception as ml_e:
+        try:
+            from app.services.ml_prediction_service import ml_prediction_service
+
+            res = ml_prediction_service.predict_threat(
+                "CICIDS2017",
+                {
+                    "srcip": src_ip,
+                    "dstip": dst_ip,
+                    "proto": proto,
+                    "dur": duration,
+                    "spkts": float(syn_flags),
+                    "sbytes": length_mean * 10.0
+                }
+            )
+
             if res and "risk_score" in res:
-                return int(res["risk_score"]), str(res.get("predicted_threat", "BENIGN"))
+                return (
+                    int(res["risk_score"]),
+                    str(
+                        res.get(
+                            "predicted_threat",
+                            "BENIGN"
+                        )
+                    )
+                )
+
         except Exception:
             pass
 
-    return (92 if syn_flags > 5 else 10), "BENIGN"
+    return (
+        92 if syn_flags > 5 else 10,
+        "BENIGN"
+    )
+
 
 @app.post("/api/analyze")
-async def analyze_traffic(request: Request, query: Optional[TrafficQuery] = None):
+async def analyze_traffic(
+    request: Request,
+    query: Optional[TrafficQuery] = None
+):
     src_ip = "192.168.1.105"
     dst_ip = "8.8.8.8"
     proto = "TCP"
@@ -754,78 +1143,202 @@ async def analyze_traffic(request: Request, query: Optional[TrafficQuery] = None
 
     try:
         body = await request.json()
+
         if body and isinstance(body, dict):
-            src_ip = body.get("source_ip") or body.get("source") or src_ip
-            dst_ip = body.get("destination_ip") or body.get("destination") or dst_ip
-            proto = body.get("protocol") or proto
-            syn_flags = body.get("syn_flag_count", 0)
-            duration = body.get("flow_duration", 0.0)
-            length_mean = body.get("packet_length_mean", 0.0)
+            src_ip = (
+                body.get("source_ip")
+                or body.get("source")
+                or src_ip
+            )
+
+            dst_ip = (
+                body.get("destination_ip")
+                or body.get("destination")
+                or dst_ip
+            )
+
+            proto = (
+                body.get("protocol")
+                or proto
+            )
+
+            syn_flags = body.get(
+                "syn_flag_count",
+                0
+            )
+
+            duration = body.get(
+                "flow_duration",
+                0.0
+            )
+
+            length_mean = body.get(
+                "packet_length_mean",
+                0.0
+            )
+
     except Exception:
         pass
 
     if query:
-        src_ip = query.source_ip or query.source or src_ip
-        dst_ip = query.destination_ip or query.destination or dst_ip
-        proto = query.protocol or proto
-        if query.syn_flag_count > 0: syn_flags = query.syn_flag_count
-        if query.flow_duration > 0.0: duration = query.flow_duration
-        if query.packet_length_mean > 0.0: length_mean = query.packet_length_mean
+        src_ip = (
+            query.source_ip
+            or query.source
+            or src_ip
+        )
 
-    target_ip = dst_ip if _is_private_ip(src_ip) and not _is_private_ip(dst_ip) else src_ip
+        dst_ip = (
+            query.destination_ip
+            or query.destination
+            or dst_ip
+        )
+
+        proto = (
+            query.protocol
+            or proto
+        )
+
+        if query.syn_flag_count > 0:
+            syn_flags = query.syn_flag_count
+
+        if query.flow_duration > 0.0:
+            duration = query.flow_duration
+
+        if query.packet_length_mean > 0.0:
+            length_mean = query.packet_length_mean
+
+    target_ip = (
+        dst_ip
+        if _is_private_ip(src_ip)
+        and not _is_private_ip(dst_ip)
+        else src_ip
+    )
 
     # Unified 4-Source Evaluation Pipeline Execution
+
     # 1. Npcap / Live Packet Stream Ingestion
-    npcap_score, npcap_telemetry = _eval_npcap_telemetry_source(src_ip, dst_ip, proto, syn_flags, duration, length_mean)
-    
+    npcap_score, npcap_telemetry = _eval_npcap_telemetry_source(
+        src_ip,
+        dst_ip,
+        proto,
+        syn_flags,
+        duration,
+        length_mean
+    )
+
     # 2. AbuseIPDB API External Threat Intelligence
-    abuse_score, abuse_meta = _eval_abuseipdb_threat_source(target_ip)
+    abuse_score, abuse_meta = _eval_abuseipdb_threat_source(
+        target_ip
+    )
+
     if abuse_score is None:
         abuse_score = npcap_score
 
     # 3. UNSW-NB15 Dataset & ML Classifier
-    unsw_score, unsw_label = _eval_unsw_dataset_source(src_ip, dst_ip, proto, duration, syn_flags, length_mean)
+    unsw_score, unsw_label = _eval_unsw_dataset_source(
+        src_ip,
+        dst_ip,
+        proto,
+        duration,
+        syn_flags,
+        length_mean
+    )
 
     # 4. CICIDS2017 Dataset & ML Anomaly Detection
-    cicids_score, cicids_label = _eval_cicids_dataset_source(src_ip, dst_ip, proto, duration, syn_flags, length_mean)
+    cicids_score, cicids_label = _eval_cicids_dataset_source(
+        src_ip,
+        dst_ip,
+        proto,
+        duration,
+        syn_flags,
+        length_mean
+    )
 
     # Multi-Source Weighted Risk Score Fusion:
     # AbuseIPDB (35%) + UNSW-NB15 (25%) + CICIDS2017 (25%) + Npcap Telemetry (15%)
-    weighted_score = (abuse_score * 0.35) + (unsw_score * 0.25) + (cicids_score * 0.25) + (npcap_score * 0.15)
-    max_source_score = max(abuse_score, unsw_score, cicids_score, npcap_score)
-    
+
+    weighted_score = (
+        (abuse_score * 0.35)
+        + (unsw_score * 0.25)
+        + (cicids_score * 0.25)
+        + (npcap_score * 0.15)
+    )
+
+    max_source_score = max(
+        abuse_score,
+        unsw_score,
+        cicids_score,
+        npcap_score
+    )
+
     # Safety Override: High severity attack signals (>= 85%) are preserved
     if max_source_score >= 85:
-        unified_risk_score = max(int(weighted_score), max_source_score)
+        unified_risk_score = max(
+            int(weighted_score),
+            max_source_score
+        )
     else:
         unified_risk_score = int(weighted_score)
 
-    status = "MALICIOUS" if unified_risk_score >= 65 else ("SUSPICIOUS" if unified_risk_score >= 20 else "SAFE (Clean Flow)")
-    flow_dir = "Downstream (Inbound)" if _is_private_ip(dst_ip) else "Upstream (Outbound)"
+    status = (
+        "MALICIOUS"
+        if unified_risk_score >= 65
+        else (
+            "SUSPICIOUS"
+            if unified_risk_score >= 20
+            else "SAFE (Clean Flow)"
+        )
+    )
+
+    flow_dir = (
+        "Downstream (Inbound)"
+        if _is_private_ip(dst_ip)
+        else "Upstream (Outbound)"
+    )
 
     if status == "MALICIOUS" or unified_risk_score >= 65:
         try:
             from app.core.state import dispatch_threat_notification
+
             dispatch_threat_notification(
                 module="traffic",
                 source_ip=src_ip,
                 target_ip=dst_ip,
-                severity="CRITICAL" if unified_risk_score > 65 else "HIGH",
+                severity=(
+                    "CRITICAL"
+                    if unified_risk_score > 65
+                    else "HIGH"
+                ),
                 title=f"🚨 CRITICAL THREAT: Malicious Flow ({src_ip})",
-                summary=f"Multi-source evaluation pipeline flagged malicious flow ({unified_risk_score}% Risk) from {src_ip} targeting {dst_ip}.",
+                summary=(
+                    f"Multi-source evaluation pipeline flagged "
+                    f"malicious flow ({unified_risk_score}% Risk) "
+                    f"from {src_ip} targeting {dst_ip}."
+                ),
                 route="/analyst/traffic-analysis"
             )
+
         except Exception as dispatch_err:
-            logger.warning(f"Notification dispatch notice: {dispatch_err}")
+            logger.warning(
+                f"Notification dispatch notice: {dispatch_err}"
+            )
 
     return {
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "timestamp": datetime.now(
+            timezone.utc
+        ).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        ),
         "source": src_ip,
         "destination": dst_ip,
         "protocol": proto,
         "flow": flow_dir,
-        "packets": npcap_telemetry["packets_formatted"],
-        "bandwidth": npcap_telemetry["bandwidth_formatted"],
+        "packets": npcap_telemetry[
+            "packets_formatted"
+        ],
+        "bandwidth": npcap_telemetry[
+            "bandwidth_formatted"
+        ],
         "score": f"{unified_risk_score}% Risk",
         "abuse_score": f"{abuse_score}% Risk",
         "abuseipdb_score": f"{abuse_score}% Risk",
@@ -843,6 +1356,7 @@ async def analyze_traffic(request: Request, query: Optional[TrafficQuery] = None
         }
     }
 
+
 @app.get("/")
 async def root():
     return {
@@ -851,6 +1365,13 @@ async def root():
         "database": "PostgreSQL Connected"
     }
 
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )
