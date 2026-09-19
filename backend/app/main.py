@@ -94,6 +94,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
+            
+
             result_logs = await session.execute(select(AuditLog))
             logs = result_logs.scalars().all()
             if not logs or len(logs) < 5:
