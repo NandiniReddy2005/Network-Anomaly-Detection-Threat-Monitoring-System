@@ -8,46 +8,40 @@ try:
 except ImportError:
     from app.core.config import settings
 
-PG_DATABASE_URL = settings.DATABASE_URL
+# Check if a remote DATABASE_URL exists (Railway provides this)
+DATABASE_URL = os.getenv("DATABASE_URL") or getattr(settings, "DATABASE_URL", None)
+SQLITE_DATABASE_URL = "sqlite+aiosqlite:///./netshield_ai.db"
 
-SQLITE_DATABASE_URL = "sqlite+aiosqlite:///d:/NetShield-AI/backend/netshield_ai.db"
-
-def is_postgres_available():
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1.5)
-        res = s.connect_ex(("127.0.0.1", 5432))
-        s.close()
-        return res == 0
-    except Exception:
-        return False
-
-if is_postgres_available():
-    DATABASE_URL = PG_DATABASE_URL
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+        
     engine = create_async_engine(
-        DATABASE_URL, 
+        DATABASE_URL,
         echo=False,
         pool_size=5,
         max_overflow=10,
         pool_pre_ping=True,
         pool_recycle=3600,
-        connect_args={"ssl": False, "timeout": 5}
+        connect_args={"timeout": 5}
     )
 else:
-    DATABASE_URL = SQLITE_DATABASE_URL
-    engine = create_async_engine(
-        DATABASE_URL,
-        echo=False
-    )
+    engine = create_async_engine(SQLITE_DATABASE_URL, echo=False)
 
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
 
-class Base(DeclarativeBase, AsyncAttrs):
+class Base(DeclarativeBase):
     pass
 
 async def get_db():
     async with AsyncSessionLocal() as session:
         try:
             yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()
