@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            
             def _migrate_audit_columns(connection):
                 for col_name, col_type in [
                     ("module", "VARCHAR(100)"),
@@ -42,13 +43,16 @@ async def lifespan(app: FastAPI):
                         connection.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {col_name} {col_type}"))
                     except Exception:
                         pass
-                for col_name, col_type in [("created_by_user", "VARCHAR(255) DEFAULT 'security@gmail.com'"), ("dataset_engine", "VARCHAR(100) DEFAULT 'UNSW-NB15'")]:
+                for col_name, col_type in [
+                    ("created_by", "VARCHAR(255) DEFAULT 'security@gmail.com'"),
+                    ("dataset_engine", "VARCHAR(100) DEFAULT 'UNSW-NB15'")
+                ]:
                     try:
                         connection.execute(text(f"ALTER TABLE incidents ADD COLUMN {col_name} {col_type}"))
                     except Exception:
                         pass
             await conn.run_sync(_migrate_audit_columns)
-        
+
         # Seed initial users & incidents if database is empty
         async with AsyncSessionLocal() as session:
             result_users = await session.execute(select(User))
@@ -85,6 +89,10 @@ async def lifespan(app: FastAPI):
                 ]
                 session.add_all(default_incidents)
                 await session.commit()
+    except Exception as e:
+        logger.error(f"Startup database initialization failed: {e}")
+
+    yield
 
             result_logs = await session.execute(select(AuditLog))
             logs = result_logs.scalars().all()
